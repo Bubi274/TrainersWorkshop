@@ -23,6 +23,8 @@ fun gui(key: String, vararg args: Any): Text = Text.translatable("gui.$MOD.$key"
 /** Một tab ở panel giữa. Các nút được tạo lại mỗi khi bản nháp thay đổi (xem EditorScreen.rebuild). */
 abstract class EditorTab(protected val screen: EditorScreen) {
     abstract val title: Text
+    /** Tab chỉ hiện khi có Pokémon đang chọn (tab đồ rơi thì không cần). */
+    open val needsPokemon = true
     open fun init() {}
     open fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {}
     open fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = false

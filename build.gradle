@@ -16,6 +16,18 @@ repositories {
         name = 'Cobblemon'
         url = 'https://maven.impactdev.net/repository/development/'
     }
+    // Modrinth maven: chỉ dùng cho Radical Cobblemon Trainers (rctmod, rctapi)
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
 }
 
 dependencies {
@@ -27,8 +39,14 @@ dependencies {
     modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
     modImplementation "com.cobblemon:fabric:${project.cobblemon_version}"
 
-    // Cobblemon Raid Dens là phụ thuộc tuỳ chọn: chỉ dùng ID bảng loot,
-    // nên không cần thư viện của nó để biên dịch.
+    // Radical Cobblemon Trainers: tuỳ chọn, chỉ cần lúc biên dịch (không đóng gói vào mod).
+    // Phiên bản khớp modpack Cobbleverse: rctmod 0.18.1-beta, rctapi 0.15.2-beta.
+    modCompileOnly "maven.modrinth:rctmod:${project.rctmod_version}"
+    modCompileOnly "maven.modrinth:rctapi:${project.rctapi_version}"
+
+    // Các phụ thuộc tuỳ chọn khác không cần để biên dịch:
+    // - Cobblemon Raid Dens: chỉ dùng ID bảng loot.
+    // - TMCraft, Only Bottle Caps: chỉ tra vật phẩm theo ID trong registry.
 }
 
 processResources {

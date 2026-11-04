@@ -2,16 +2,85 @@
 
 A Cobblemon addon (Fabric, Minecraft 1.21.1) with tools for trainers and server admins.
 
-## Features
+## Items
 
-**Shiny Berry** (`trainers_workshop:shiny_berry`)
+All items are in the **Trainer's Workshop** creative tab.
+
+| Item | ID | How to get it | Who can use it |
+| --- | --- | --- | --- |
+| Shiny Berry | `trainers_workshop:shiny_berry` | 7-star raid reward (with Cobblemon Raid Dens), creative tab | Everyone |
+| PokeEditor | `trainers_workshop:pokeeditor` | Crafting (see below), creative tab | Everyone |
+| PokeEditor (Creative) | `trainers_workshop:pokeeditor_creative` | Creative tab only | Operators (permission level 2) |
+| Trainer Editor | `trainers_workshop:trainer_editor` | Creative tab only | Operators (permission level 2) |
+
+All checks and changes run on the server. The client only sends requests, and the server checks
+every request again.
+
+### Shiny Berry
 
 - Right-click one of **your own** sent-out Pokémon to make it shiny.
 - Uses up one berry (not in creative mode). If the Pokémon is already shiny, the berry is not used.
 - Doesn't work on wild Pokémon, other trainers' Pokémon, or Pokémon in battle.
 - Has no crafting recipe, can't be planted, and can't be eaten.
-- With Cobblemon Raid Dens installed, it can drop as a 7-star raid reward (5% by default).
-- Available in the "Trainer's Workshop" creative tab.
+- With Cobblemon Raid Dens installed, it can drop as a 7-star raid reward (5% by default, see Config).
+
+### PokeEditor (Creative)
+
+Right-click in the air to open the editor for your party. Everything is free:
+
+- IVs (0–31), EVs (0–252 each, 510 total)
+- Nature
+- Moves (any move the species can learn)
+- Shiny, ability, gender, level, Poké Ball
+
+Click a `+`/`-` button to change a value by 1, or shift-click to change it by 10. Changes apply to
+the selected Pokémon when you press **Apply**. Switching to another Pokémon discards changes you
+haven't applied.
+
+### PokeEditor (Survival)
+
+Same screen, but every change costs items from your inventory. The items are taken when you press
+**Apply**. If an item is missing, that part turns red and **Apply** is locked. In creative mode no
+items are used.
+
+| Change | Cost |
+| --- | --- |
+| Raise one IV to 31 | The matching Bottle Cap (Only Bottle Caps) |
+| Raise all six IVs to 31 | One Gold Bottle Cap (Only Bottle Caps) |
+| Raise an EV | A vitamin (+10) or a feather (+1) for that stat (Cobblemon) |
+| Lower an EV | An EV-reducing berry for that stat, such as Pomeg or Kelpsy (−10 each) |
+| Change nature | The mint for the new nature (Cobblemon). Works exactly like using the mint normally. |
+| Switch to a move the Pokémon has already learned | Free |
+| Teach a new move | The TM for that move (TMCraft). The TM is used up. |
+| Make shiny | One Shiny Berry |
+
+Ability, level, gender and Poké Ball can't be changed in Survival.
+
+**Recipe** (shaped):
+
+```text
+.  .  B      B = Poké Ball (cobblemon:poke_ball)
+.  S  .      S = Stick
+S  .  .
+```
+
+### Trainer Editor
+
+Right-click a trainer from Radical Cobblemon Trainers (RCT) to edit **that one trainer**:
+
+- **Team** (up to 6 Pokémon): type a species name, then **Set** (replace the selected Pokémon) or
+  **Add**. **Remove** deletes the selected Pokémon. Each Pokémon can be edited like in the Creative
+  PokeEditor.
+- **Loot** tab: add the item in your main hand (Shiny Berries work too), then set its count and drop
+  chance. Choose whether the custom loot drops on **every win** or only on **each player's first
+  win**, and whether the trainer's **default loot** still drops.
+- **Save** stores the changes in the world. They are used from the trainer's next battle and survive
+  server restarts. Saving also stops the trainer from despawning.
+- **Reset** deletes all edits right away and brings back the trainer's original team and loot.
+
+Limits: edits belong to that trainer entity only. Trainers that a spawner spawns again later use their
+default team. Edited teams lose RCT's Mega/Tera/Dynamax settings. Details are in
+[docs/trainer-editor-notes.md](docs/trainer-editor-notes.md).
 
 ## Dependencies
 
@@ -22,7 +91,12 @@ A Cobblemon addon (Fabric, Minecraft 1.21.1) with tools for trainers and server 
 | Fabric API | 0.116.17+1.21.1 | yes |
 | Cobblemon | 1.7.3+1.21.1 (Fabric) | yes |
 | Fabric Language Kotlin | 1.13.6 or newer (bundled with Cobblemon) | yes |
-| Cobblemon Raid Dens | any | no |
+| Cobblemon Raid Dens | any | no: Shiny Berry raid drop |
+| Radical Cobblemon Trainers (rctmod + rctapi) | 0.18.1-beta / 0.15.2-beta | no: Trainer Editor |
+| TMCraft | 1.4.18+1.7.3 | no: teaching new moves in the Survival PokeEditor |
+| Only Bottle Caps | 1.3.0 | no: raising IVs in the Survival PokeEditor |
+
+Without an optional mod, the game still runs. The features that need it show as unavailable.
 
 Install the mod on **both the server and the client**.
 
@@ -37,7 +111,8 @@ Requires Java 21. From the project folder, run:
 The mod file is `build/libs/trainers_workshop-1.0.0.jar`. Don't use the `-sources.jar` file.
 
 The first build downloads Minecraft and its libraries, so it takes a few minutes and needs access to
-`piston-meta.mojang.com`, `libraries.minecraft.net`, `maven.fabricmc.net` and `maven.impactdev.net`.
+`piston-meta.mojang.com`, `libraries.minecraft.net`, `maven.fabricmc.net`, `maven.impactdev.net` and
+`api.modrinth.com`.
 
 ## Testing in a dev environment
 
@@ -45,7 +120,8 @@ The first build downloads Minecraft and its libraries, so it takes a few minutes
 ./gradlew runClient
 ```
 
-This launches Minecraft with Fabric API, Cobblemon and this mod installed.
+This launches Minecraft with Fabric API, Cobblemon and this mod. The optional mods are not included,
+so test the raid drop, Trainer Editor, TMs and Bottle Caps in the real modpack.
 
 ## Installing in a modpack
 
@@ -75,7 +151,12 @@ src/main/kotlin/io/github/bubi274/trainersworkshop/
   TrainersWorkshop.kt        mod entry point
   config/                    config file
   registry/                  item and creative tab registration
-  item/                      individual items (ShinyBerryItem, ...)
-  interaction/               right-click-on-Pokémon handling (shared by future tools)
-  compat/                    integrations with other mods (Raid Dens)
+  item/                      individual items
+  interaction/               right-click-on-entity handling shared by the tools
+  editor/                    editor data, server-side checks and changes, survival costs, trainer edits
+  network/                   packets between client and server
+  client/                    client entry point and the editor screen
+  compat/                    integrations with other mods (Raid Dens, RCT)
+src/main/java/.../mixin/     mixins into RCT (only applied when RCT is installed)
+docs/                        design notes
 ```

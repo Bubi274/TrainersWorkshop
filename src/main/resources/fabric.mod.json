@@ -33,6 +33,12 @@
     "cobblemon": ">=1.7.3"
   },
   "suggests": {
-    "cobblemonraiddens": "*"
-  }
+    "cobblemonraiddens": "*",
+    "rctmod": "*",
+    "tmcraft": "*",
+    "obc": "*"
+  },
+  "mixins": [
+    "trainers_workshop.mixins.json"
+  ]
 }

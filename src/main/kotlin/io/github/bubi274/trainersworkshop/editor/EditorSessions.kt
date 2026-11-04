@@ -36,6 +36,10 @@ object EditorSessions {
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ -> sessions.remove(handler.player.uuid) }
     }
 
+    fun put(player: ServerPlayerEntity, session: EditorSession) {
+        sessions[player.uuid] = session
+    }
+
     fun openPartyEditor(player: ServerPlayerEntity, mode: EditorMode) {
         sessions[player.uuid] = EditorSession(mode)
         sendPartyState(player, mode, null)
@@ -62,8 +66,10 @@ object EditorSessions {
         }
     }
 
-    /** Chỗ để các giai đoạn sau gắn thêm hành động (trainer editor). */
-    private fun handleExtra(player: ServerPlayerEntity, session: EditorSession, nbt: NbtCompound) = Unit
+    /** Hành động riêng của Trainer Editor. */
+    private fun handleExtra(player: ServerPlayerEntity, session: EditorSession, nbt: NbtCompound) {
+        if (session is TrainerEditorSession) TrainerEditing.handle(player, session, nbt)
+    }
 
     private fun applyToParty(player: ServerPlayerEntity, session: EditorSession, nbt: NbtCompound) {
         val status = tryApplyToParty(player, session, nbt)

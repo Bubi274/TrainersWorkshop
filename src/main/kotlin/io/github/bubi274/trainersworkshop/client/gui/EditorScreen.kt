@@ -13,6 +13,7 @@ import io.github.bubi274.trainersworkshop.editor.EditorSlot
 import io.github.bubi274.trainersworkshop.editor.EditorState
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
 import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
+import io.github.bubi274.trainersworkshop.editor.TrainerEditing
 import io.github.bubi274.trainersworkshop.editor.readStringList
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
@@ -20,6 +21,7 @@ import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.tooltip.Tooltip
 import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.gui.widget.ClickableWidget
+import net.minecraft.client.gui.widget.TextFieldWidget
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.text.Text
@@ -64,7 +66,36 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     private fun createTabs(): List<EditorTab> = when (state.mode) {
         EditorMode.SURVIVAL -> listOf(SurvivalStatsTab(this), SurvivalMovesTab(this), SurvivalNatureTab(this), SurvivalOtherTab(this))
-        else -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
+        EditorMode.TRAINER -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this), LootTab(this))
+        EditorMode.CREATIVE -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
+    }
+
+    /** Trainer Editor: thông tin trainer và đồ rơi (giải mã một lần mỗi khi server gửi trạng thái). */
+    var trainer: TrainerView? = null
+        private set
+
+    /** Ô nhập tên loài (Trainer Editor), giữ lại khi các nút được tạo lại. */
+    private var speciesInput = ""
+
+    private fun decodeTrainer(): TrainerView? {
+        val nbt = state.trainer ?: return null
+        val registries = client?.world?.registryManager ?: return null
+        return TrainerView.from(nbt, registries)
+    }
+
+    /** Gửi một hành động của Trainer Editor; gửi trước các chỉnh sửa Pokémon chưa lưu vào bản nháp. */
+    fun trainerAction(action: String, fill: NbtCompound.() -> Unit) {
+        pushPendingEdit()
+        ClientEditor.send(action, fill)
+    }
+
+    private fun pushPendingEdit() {
+        val data = draft
+        if (mode != EditorMode.TRAINER || data == null || !isDirty) return
+        ClientEditor.send(TrainerEditing.EDIT) {
+            putInt("index", selectedIndex)
+            put("data", data.toNbt())
+        }
     }
 
     /** Survival: vật phẩm cần cho bản nháp hiện tại, tính bằng túi đồ phía client (server tính lại khi Apply). */
@@ -84,6 +115,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     fun update(newState: EditorState, newStatus: NbtCompound?) {
         state = newState
         status = newStatus
+        trainer = decodeTrainer()
         if (state.slot(selectedIndex) == null) selectedIndex = state.slots.firstOrNull()?.index ?: -1
         draft = state.slot(selectedIndex)?.data
         rebuild()
@@ -91,7 +123,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     fun select(index: Int) {
         if (state.slot(index) == null || index == selectedIndex) return
-        // Thay đổi chưa Apply của Pokémon cũ bị bỏ.
+        // PokeEditor: thay đổi chưa Apply của Pokémon cũ bị bỏ. Trainer Editor: đưa vào bản nháp của server.
+        pushPendingEdit()
         selectedIndex = index
         draft = state.slot(index)?.data
         status = null
@@ -130,8 +163,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         tabs.forEachIndexed { i, tab ->
             button(tab.title, contentX - 1 + i * tabWidth, top + 1, tabWidth, 12, tab.title, active = tab != activeTab) { switchTab(tab) }
         }
-        if (draft != null) activeTab.init()
-        initRightPanel()
+        if (draft != null || !activeTab.needsPokemon) activeTab.init()
+        if (mode == EditorMode.TRAINER) initTrainerPanel() else initRightPanel()
         updateModel()
     }
 
@@ -139,6 +172,34 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val y = top + 137
         button(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cancel"), left + 216, y, 54, 13) { cancel() }
         button(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.apply"), left + 273, y, 54, 13, active = canApply()) { apply() }
+    }
+
+    /** Panel phải của Trainer Editor: đổi loài, thêm/bớt Pokémon, Reset / Close / Save. */
+    private fun initTrainerPanel() {
+        if (trainer == null) trainer = decodeTrainer()
+        val x = left + 216
+        val field = TextFieldWidget(textRenderer, x, top + 78, 111, 12, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.species"))
+        field.setMaxLength(64)
+        field.text = speciesInput
+        field.setPlaceholder(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.species.placeholder"))
+        field.setChangedListener { speciesInput = it }
+        addWidget(field)
+        val gui = { key: String -> Text.translatable("gui.${TrainersWorkshop.MOD_ID}.$key") }
+        button(gui("button.set_species"), x, top + 93, 36, 12, gui("hint.set_species"), active = selectedSlot != null) {
+            trainerAction(TrainerEditing.SET_SPECIES) {
+                putInt("index", selectedIndex)
+                putString("species", speciesInput)
+            }
+        }
+        button(gui("button.add"), x + 38, top + 93, 36, 12, gui("hint.add_pokemon"), active = state.slots.size < 6) {
+            trainerAction(TrainerEditing.ADD) { putString("species", speciesInput) }
+        }
+        button(gui("button.remove"), x + 76, top + 93, 36, 12, gui("hint.remove_pokemon"), active = state.slots.size > 1 && selectedSlot != null) {
+            trainerAction(TrainerEditing.REMOVE) { putInt("index", selectedIndex) }
+        }
+        button(gui("button.reset"), x, top + 137, 36, 13, gui("hint.reset")) { trainerAction(TrainerEditing.RESET) {} }
+        button(gui("button.close"), x + 38, top + 137, 36, 13) { close() }
+        button(gui("button.save"), x + 76, top + 137, 36, 13, gui("hint.save")) { trainerAction(TrainerEditing.SAVE) {} }
     }
 
     fun canApply(): Boolean = isDirty && (mode != EditorMode.SURVIVAL || survivalCost()?.ok == true)
@@ -196,7 +257,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         renderParty(context, mouseX, mouseY)
         renderCost(context)
         renderRightPanelInfo(context, mouseX, mouseY)
-        if (draft != null) {
+        if (draft != null || !activeTab.needsPokemon) {
             activeTab.render(context, mouseX, mouseY, delta)
         } else {
             GuiKit.centeredText(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.no_pokemon"), contentX + contentWidth / 2, contentY + 60, GuiKit.GRAY)
@@ -251,7 +312,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    fun partyTitle(): Text = Text.translatable("gui.${TrainersWorkshop.MOD_ID}.party")
+    fun partyTitle(): Text {
+        val view = trainer ?: return Text.translatable("gui.${TrainersWorkshop.MOD_ID}.party")
+        val key = if (view.customized) "trainer.edited" else "trainer.default"
+        return Text.translatable("gui.${TrainersWorkshop.MOD_ID}.$key", view.name)
+    }
 
     /** Vùng dưới đội hình: thông báo kết quả từ server. */
     private fun renderRightPanelInfo(context: DrawContext, mouseX: Int, mouseY: Int) {
@@ -263,7 +328,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         lines.take(3).forEachIndexed { i, line ->
             val matrices = context.matrices
             matrices.push()
-            matrices.translate((left + 216).toDouble(), (top + 112 + i * 6).toDouble(), 0.0)
+            val statusY = if (mode == EditorMode.TRAINER) top + 108 else top + 112
+            matrices.translate((left + 216).toDouble(), (statusY + i * 6).toDouble(), 0.0)
             matrices.scale(0.5f, 0.5f, 1f)
             context.drawText(textRenderer, line, 0, 0, color, true)
             matrices.pop()
@@ -316,12 +382,12 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
                 return true
             }
         }
-        if (draft != null && activeTab.mouseClicked(mouseX, mouseY, button)) return true
+        if ((draft != null || !activeTab.needsPokemon) && activeTab.mouseClicked(mouseX, mouseY, button)) return true
         return super.mouseClicked(mouseX, mouseY, button)
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, horizontalAmount: Double, verticalAmount: Double): Boolean {
-        if (draft != null && activeTab.mouseScrolled(mouseX, mouseY, verticalAmount)) return true
+        if ((draft != null || !activeTab.needsPokemon) && activeTab.mouseScrolled(mouseX, mouseY, verticalAmount)) return true
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)
     }
 

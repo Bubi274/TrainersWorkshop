@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.bubi274.trainersworkshop.mixin",
+  "plugin": "io.github.bubi274.trainersworkshop.mixin.TrainersWorkshopMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "rct.RCTModMixin",
+    "rct.TrainerMobMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
