@@ -86,6 +86,18 @@ object EditorSessions {
                 PokemonEditing.validateCreative(pokemon, target)?.let { return EditorStatus(it, error = true) }
                 PokemonEditing.applyCreative(pokemon, target)
             }
+            EditorMode.SURVIVAL -> {
+                val current = PokemonEditing.snapshot(pokemon)
+                val options = PokemonEditing.options(pokemon)
+                PokemonEditing.validateMoves(pokemon, target.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
+                val free = player.abilities.creativeMode
+                val cost = SurvivalCosts.compute(current, target, options, { player.inventory.count(it) }, free)
+                cost.error?.let { return EditorStatus(it, error = true) }
+                if (cost.problems.isNotEmpty()) return EditorStatus("missing_items", error = true)
+                if (cost.isEmpty) return EditorStatus("nothing_to_apply")
+                if (!free) InventoryUtil.take(player, cost.needed)
+                PokemonEditing.applySurvival(pokemon, current, target)
+            }
             else -> return EditorStatus("invalid_request", error = true)
         }
         return EditorStatus("applied", listOf(pokemon.getDisplayName(false).string))

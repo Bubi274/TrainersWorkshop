@@ -39,10 +39,13 @@ object PokemonEditing {
         val current = currentMoves(pokemon).filter { it.isNotEmpty() }
         val legal = pokemon.form.moves.getAllLegalMoves().map { it.name } + current
         val free = pokemon.allAccessibleMoves.map { it.name } + current
+        val learnset = pokemon.form.moves
+        val tm = learnset.levelUpMoves.values.flatten().map { it.name } + learnset.tmMoves.map { it.name }
         val abilities = pokemon.form.abilities.map { it.template.name } + pokemon.ability.name
         return PokemonEditOptions(
             legalMoves = legal.distinct().sorted(),
             freeMoves = free.distinct().sorted(),
+            tmMoves = tm.distinct().sorted(),
             abilities = abilities.distinct(),
             genders = allowedGenders(pokemon).map { it.name },
         )
@@ -121,6 +124,18 @@ object PokemonEditing {
         applyMoves(pokemon, target.moves)
         if (pokemon.shiny != target.shiny) pokemon.shiny = target.shiny
         PokeBalls.getPokeBall(Identifier.of(target.ball))?.let { if (pokemon.caughtBall != it) pokemon.caughtBall = it }
+    }
+
+    /** Ghi thay đổi survival (đã kiểm tra chi phí bằng SurvivalCosts). Chỉ đổi IV, EV, nature (mint), chiêu, shiny. */
+    fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData) {
+        setIvs(pokemon, target.ivs)
+        setEvs(pokemon, target.evs)
+        if (target.effectiveNature != current.effectiveNature) {
+            // Giống hệt khi dùng mint của Cobblemon: chỉ đặt mintedNature.
+            Natures.getNature(Identifier.of(target.mintedNature))?.let { pokemon.mintedNature = it }
+        }
+        applyMoves(pokemon, target.moves)
+        if (target.shiny && !pokemon.shiny) pokemon.shiny = true
     }
 
     fun setIvs(pokemon: Pokemon, ivs: List<Int>) {

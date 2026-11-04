@@ -89,12 +89,15 @@ data class PokemonEditOptions(
     val legalMoves: List<String>,
     /** Chiêu đổi miễn phí: đã từng học hoặc học theo level. */
     val freeMoves: List<String>,
+    /** Chiêu dạy được bằng TM của TMCraft (học theo level hoặc theo TM). */
+    val tmMoves: List<String>,
     val abilities: List<String>,
     val genders: List<String>,
 ) {
     fun toNbt(): NbtCompound = NbtCompound().apply {
         put("legalMoves", stringList(legalMoves))
         put("freeMoves", stringList(freeMoves))
+        put("tmMoves", stringList(tmMoves))
         put("abilities", stringList(abilities))
         put("genders", stringList(genders))
     }
@@ -103,6 +106,7 @@ data class PokemonEditOptions(
         fun fromNbt(nbt: NbtCompound) = PokemonEditOptions(
             legalMoves = readStringList(nbt, "legalMoves"),
             freeMoves = readStringList(nbt, "freeMoves"),
+            tmMoves = readStringList(nbt, "tmMoves"),
             abilities = readStringList(nbt, "abilities"),
             genders = readStringList(nbt, "genders"),
         )

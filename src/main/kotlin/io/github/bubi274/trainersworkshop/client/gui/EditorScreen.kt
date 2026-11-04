@@ -12,6 +12,7 @@ import io.github.bubi274.trainersworkshop.editor.EditorMode
 import io.github.bubi274.trainersworkshop.editor.EditorSlot
 import io.github.bubi274.trainersworkshop.editor.EditorState
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
+import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
 import io.github.bubi274.trainersworkshop.editor.readStringList
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
@@ -61,7 +62,23 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     val isDirty: Boolean get() = draft != null && draft != selectedSlot?.data
 
-    private fun createTabs(): List<EditorTab> = listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
+    private fun createTabs(): List<EditorTab> = when (state.mode) {
+        EditorMode.SURVIVAL -> listOf(SurvivalStatsTab(this), SurvivalMovesTab(this), SurvivalNatureTab(this), SurvivalOtherTab(this))
+        else -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
+    }
+
+    /** Survival: vật phẩm cần cho bản nháp hiện tại, tính bằng túi đồ phía client (server tính lại khi Apply). */
+    fun survivalCost(): SurvivalCosts.Result? {
+        if (mode != EditorMode.SURVIVAL) return null
+        val slot = selectedSlot ?: return null
+        val data = draft ?: return null
+        val player = client?.player ?: return null
+        return SurvivalCosts.compute(slot.data, data, slot.options, { player.inventory.count(it) }, player.abilities.creativeMode)
+    }
+
+    fun hasProblem(field: String): Boolean = survivalCost()?.problems?.contains(field) == true
+
+    fun haveCount(item: net.minecraft.item.Item): Int = client?.player?.inventory?.count(item) ?: 0
 
     /** Server gửi trạng thái mới (sau Apply hoặc khi đội hình thay đổi). */
     fun update(newState: EditorState, newStatus: NbtCompound?) {
@@ -124,7 +141,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         button(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.apply"), left + 273, y, 54, 13, active = canApply()) { apply() }
     }
 
-    fun canApply(): Boolean = isDirty
+    fun canApply(): Boolean = isDirty && (mode != EditorMode.SURVIVAL || survivalCost()?.ok == true)
 
     private fun cancel() {
         if (isDirty) {
@@ -177,6 +194,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         renderTitle(context)
         renderInfo(context)
         renderParty(context, mouseX, mouseY)
+        renderCost(context)
         renderRightPanelInfo(context, mouseX, mouseY)
         if (draft != null) {
             activeTab.render(context, mouseX, mouseY, delta)
@@ -242,13 +260,51 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val message = Text.translatable(statusNbt.getString("key"), *args)
         val color = if (statusNbt.getBoolean("error")) GuiKit.RED else GuiKit.GREEN
         val lines = textRenderer.wrapLines(message, 220)
-        lines.take(4).forEachIndexed { i, line ->
+        lines.take(3).forEachIndexed { i, line ->
             val matrices = context.matrices
             matrices.push()
-            matrices.translate((left + 216).toDouble(), (top + 78 + i * 6).toDouble(), 0.0)
+            matrices.translate((left + 216).toDouble(), (top + 112 + i * 6).toDouble(), 0.0)
             matrices.scale(0.5f, 0.5f, 1f)
             context.drawText(textRenderer, line, 0, 0, color, true)
             matrices.pop()
+        }
+    }
+
+    /** Survival: danh sách vật phẩm cần (đỏ nếu thiếu). */
+    private fun renderCost(context: DrawContext) {
+        val cost = survivalCost() ?: return
+        val x = left + 216
+        var y = top + 78
+        GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost"), x, y, GuiKit.GRAY, 0.5f)
+        y += 6
+        val creative = client?.player?.abilities?.creativeMode == true
+        if (cost.isEmpty) {
+            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.none"), x, y, GuiKit.GRAY, 0.5f)
+            return
+        }
+        if (creative) {
+            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.creative"), x, y, GuiKit.GOLD, 0.5f)
+            y += 6
+        }
+        val entries = cost.needed.entries.toList()
+        val shown = entries.take(4)
+        shown.forEach { (item, count) ->
+            val have = haveCount(item)
+            val color = if (creative || have >= count) GuiKit.WHITE else GuiKit.RED
+            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", item.name, have, count), x, y, color, 0.5f)
+            y += 6
+        }
+        if (entries.size > shown.size) {
+            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.more", entries.size - shown.size), x, y, GuiKit.GRAY, 0.5f)
+            y += 6
+        }
+        // Vật phẩm của mod tuỳ chọn chưa cài (Only Bottle Caps, TMCraft).
+        cost.lines.filter { it.item == null }.map { it.missingItemId ?: it.field }.distinct().take(2).forEach { id ->
+            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.unavailable", id), x, y, GuiKit.RED, 0.5f)
+            y += 6
+        }
+        cost.error?.let {
+            GuiKit.text(context, textRenderer, Text.translatable("message.${TrainersWorkshop.MOD_ID}.editor.$it"), x, y, GuiKit.RED, 0.5f)
         }
     }
 

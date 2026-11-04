@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "tools",
+  "pattern": [
+    "  B",
+    " S ",
+    "S  "
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:stick"
+    },
+    "B": {
+      "item": "cobblemon:poke_ball"
+    }
+  },
+  "result": {
+    "id": "trainers_workshop:pokeeditor",
+    "count": 1
+  }
+}
