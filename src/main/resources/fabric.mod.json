@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "trainers_workshop",
+  "version": "${version}",
+  "name": "Trainer's Workshop",
+  "description": "Tools for Cobblemon trainers and server admins. Adds the Shiny Berry.",
+  "authors": ["Bubi274"],
+  "license": "All-Rights-Reserved",
+  "icon": "assets/trainers_workshop/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      {
+        "adapter": "kotlin",
+        "value": "io.github.bubi274.trainersworkshop.TrainersWorkshop"
+      }
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.13.6",
+    "cobblemon": ">=1.7.3"
+  },
+  "suggests": {
+    "cobblemonraiddens": "*"
+  }
+}

@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Loom dev run folder
+run/
+
+# Built or downloaded jars (the Gradle wrapper jar is needed to run ./gradlew)
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+bin/
+.classpath
+.project
+.settings/
+
+# Kotlin
+.kotlin/
+
+# OS
+.DS_Store

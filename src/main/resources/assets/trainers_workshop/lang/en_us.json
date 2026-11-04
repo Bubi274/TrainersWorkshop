@@ -1,0 +1,12 @@
+{
+  "itemGroup.trainers_workshop": "Trainer's Workshop",
+
+  "item.trainers_workshop.shiny_berry": "Shiny Berry",
+  "item.trainers_workshop.shiny_berry.tooltip": "Right-click one of your own sent-out Pokémon to make it shiny.",
+
+  "message.trainers_workshop.shiny_berry.success": "%s is now shiny!",
+  "message.trainers_workshop.shiny_berry.already_shiny": "%s is already shiny.",
+  "message.trainers_workshop.shiny_berry.wild": "You can't use a Shiny Berry on a wild Pokémon.",
+  "message.trainers_workshop.shiny_berry.not_owner": "This Pokémon belongs to another trainer.",
+  "message.trainers_workshop.shiny_berry.in_battle": "You can't use a Shiny Berry while the Pokémon is in battle."
+}
