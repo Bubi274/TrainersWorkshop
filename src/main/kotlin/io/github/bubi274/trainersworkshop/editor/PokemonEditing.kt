@@ -30,6 +30,7 @@ object PokemonEditing {
         mintedNature = pokemon.mintedNature?.name?.toString() ?: "",
         ability = pokemon.ability.name,
         ivs = EDITOR_STATS.map { pokemon.ivs.getOrDefault(it) },
+        hyperIvs = EDITOR_STATS.map { pokemon.ivs.hyperTrainedIVs[it] ?: NO_HYPER },
         evs = EDITOR_STATS.map { pokemon.evs.getOrDefault(it) },
         moves = currentMoves(pokemon),
         ball = pokemon.caughtBall.name.toString(),
@@ -128,7 +129,22 @@ object PokemonEditing {
 
     /** Ghi thay đổi survival (đã kiểm tra chi phí bằng SurvivalCosts). Chỉ đổi IV, EV, nature (mint), chiêu, shiny. */
     fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData) {
+        // 1) Bottle Cap / Withered Bottle Cap: Only Bottle Caps đổi IV gốc bằng Pokemon.setIV.
         setIvs(pokemon, target.ivs)
+        // TODO(build): thử trong game rằng kết quả giống hệt khi ăn từng viên kẹo (xem tooltip "effective IV").
+        // 2) Kẹo IV: giống HyperTrainingItem của Cobblemon, mỗi kẹo gọi
+        //    hyperTrainIV(stat, IV có hiệu lực ± 1); IV gốc không đổi.
+        EDITOR_STATS.forEachIndexed { i, stat ->
+            if (target.hyperIvs[i] == current.hyperIvs[i]) return@forEachIndexed
+            val goal = target.effectiveIv(i)
+            repeat(SurvivalCosts.MAX_IV + 1) {
+                val effective = pokemon.ivs.getEffectiveBattleIV(stat)
+                if (effective == goal) return@forEachIndexed
+                pokemon.hyperTrainIV(stat, if (goal > effective) effective + 1 else effective - 1)
+                // Sự kiện của Cobblemon có thể huỷ việc hyper train: dừng để không lặp mãi.
+                if (pokemon.ivs.getEffectiveBattleIV(stat) == effective) return@forEachIndexed
+            }
+        }
         setEvs(pokemon, target.evs)
         if (target.effectiveNature != current.effectiveNature) {
             // Giống hệt khi dùng mint của Cobblemon: chỉ đặt mintedNature.

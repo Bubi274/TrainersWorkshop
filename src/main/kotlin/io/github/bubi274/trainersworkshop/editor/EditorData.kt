@@ -22,6 +22,9 @@ val EDITOR_STATS: List<Stat> = listOf(
 
 const val MOVE_SLOTS = 4
 
+/** Giá trị trong PokemonEditData.hyperIvs khi chỉ số đó không được "hyper train". */
+const val NO_HYPER = -1
+
 /** Các giá trị chỉnh được của một Pokémon. */
 data class PokemonEditData(
     val uuid: UUID,
@@ -35,14 +38,25 @@ data class PokemonEditData(
     /** Nature do mint ("" nếu chưa dùng mint). */
     val mintedNature: String,
     val ability: String,
+    /** IV gốc. */
     val ivs: List<Int>,
+    /**
+     * IV "hyper trained" của Cobblemon (kẹo IV ghi vào đây), -1 nếu không có.
+     * IV có hiệu lực trong trận = hyper nếu có, ngược lại là IV gốc.
+     */
+    val hyperIvs: List<Int> = List(EDITOR_STATS.size) { NO_HYPER },
     val evs: List<Int>,
     /** Luôn có [MOVE_SLOTS] phần tử, "" là ô trống. */
     val moves: List<String>,
     val ball: String,
-    /** Survival: dùng Gold Bottle Cap để đưa cả 6 IV lên 31. */
+    /** Survival: dùng Gold Bottle Cap để đưa cả 6 IV gốc lên 31. */
     val useGoldCap: Boolean = false,
+    /** Survival: dùng Gold Withered Bottle Cap để đưa cả 6 IV gốc về 0. */
+    val useGoldWithered: Boolean = false,
 ) {
+    /** IV có hiệu lực (giống IVs.getEffectiveBattleIV của Cobblemon). */
+    fun effectiveIv(index: Int): Int = hyperIvs[index].takeIf { it >= 0 } ?: ivs[index]
+
     /** Nature đang có hiệu lực (mint nếu có). */
     val effectiveNature: String get() = mintedNature.ifEmpty { nature }
 
@@ -57,10 +71,12 @@ data class PokemonEditData(
         putString("mintedNature", mintedNature)
         putString("ability", ability)
         putIntArray("ivs", ivs.toIntArray())
+        putIntArray("hyperIvs", hyperIvs.toIntArray())
         putIntArray("evs", evs.toIntArray())
         put("moves", stringList(moves))
         putString("ball", ball)
         putBoolean("useGoldCap", useGoldCap)
+        putBoolean("useGoldWithered", useGoldWithered)
     }
 
     companion object {
@@ -75,10 +91,12 @@ data class PokemonEditData(
             mintedNature = nbt.getString("mintedNature"),
             ability = nbt.getString("ability"),
             ivs = fixedSize(nbt.getIntArray("ivs").toList(), EDITOR_STATS.size, 0),
+            hyperIvs = fixedSize(nbt.getIntArray("hyperIvs").toList(), EDITOR_STATS.size, NO_HYPER),
             evs = fixedSize(nbt.getIntArray("evs").toList(), EDITOR_STATS.size, 0),
             moves = fixedSize(readStringList(nbt, "moves"), MOVE_SLOTS, ""),
             ball = nbt.getString("ball"),
             useGoldCap = nbt.getBoolean("useGoldCap"),
+            useGoldWithered = nbt.getBoolean("useGoldWithered"),
         )
     }
 }

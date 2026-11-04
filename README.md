@@ -45,14 +45,21 @@ items are used.
 
 | Change | Cost |
 | --- | --- |
-| Raise one IV to 31 | The matching Bottle Cap (Only Bottle Caps) |
-| Raise all six IVs to 31 | One Gold Bottle Cap (Only Bottle Caps) |
+| Raise or lower an effective IV by 1 | The matching IV candy (Cobblemon): Health, Mighty, Tough, Smart, Courage or Quick Candy to raise; Sickly, Weak, Brittle, Numb, Coward or Slow Candy to lower |
+| Set one base IV to 31 / to 0 | The matching Bottle Cap / Withered Bottle Cap (Only Bottle Caps) |
+| Set all six base IVs to 31 / to 0 | One Gold Bottle Cap / Gold Withered Bottle Cap (Only Bottle Caps) |
 | Raise an EV | A vitamin (+10) or a feather (+1) for that stat (Cobblemon) |
 | Lower an EV | An EV-reducing berry for that stat, such as Pomeg or Kelpsy (−10 each) |
 | Change nature | The mint for the new nature (Cobblemon). Works exactly like using the mint normally. |
 | Switch to a move the Pokémon has already learned | Free |
 | Teach a new move | The TM for that move (TMCraft). The TM is used up. |
 | Make shiny | One Shiny Berry |
+
+IVs work the same way as in Cobblemon. Candies change the **effective IV** (Cobblemon's hyper training),
+not the base IV. Bottle Caps change the **base IV**, exactly like Only Bottle Caps does. When a Pokémon
+has an effective IV, that value is used in battle. The IV tab shows how many of each item you have next
+to its button. Buttons are locked when you don't have enough items or the IV would leave 0–31. When you
+press **Apply**, caps are used first, then candies.
 
 Ability, level, gender and Poké Ball can't be changed in Survival.
 

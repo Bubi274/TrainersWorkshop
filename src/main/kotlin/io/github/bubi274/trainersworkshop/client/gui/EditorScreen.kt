@@ -355,14 +355,17 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.creative"), x, y, GuiKit.GOLD, 0.5f)
             y += 6
         }
+        // Hai cột, mỗi dòng: "số sẽ trừ x tên (đang có)", đỏ nếu không đủ.
         val entries = cost.needed.entries.toList()
-        val shown = entries.take(4)
-        shown.forEach { (item, count) ->
+        val shown = entries.take(8)
+        shown.forEachIndexed { i, (item, count) ->
             val have = haveCount(item)
             val color = if (creative || have >= count) GuiKit.WHITE else GuiKit.RED
-            GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", item.name, have, count), x, y, color, 0.5f)
-            y += 6
+            val line = Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", count, item.name, have).string
+            val trimmed = textRenderer.trimToWidth(line, 108)
+            GuiKit.text(context, textRenderer, Text.literal(trimmed), x + (i % 2) * 56, y + (i / 2) * 6, color, 0.5f)
         }
+        y += ((shown.size + 1) / 2) * 6
         if (entries.size > shown.size) {
             GuiKit.text(context, textRenderer, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.more", entries.size - shown.size), x, y, GuiKit.GRAY, 0.5f)
             y += 6

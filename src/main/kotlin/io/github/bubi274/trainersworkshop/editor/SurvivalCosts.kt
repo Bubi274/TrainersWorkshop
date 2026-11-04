@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.api.pokemon.stats.Stat
 import com.cobblemon.mod.common.api.pokemon.stats.Stats
 import com.cobblemon.mod.common.item.berry.FriendshipRaisingBerryItem
 import com.cobblemon.mod.common.item.interactive.EVIncreaseItem
+import com.cobblemon.mod.common.item.interactive.HyperTrainingItem
 import com.cobblemon.mod.common.item.interactive.MintItem
 import io.github.bubi274.trainersworkshop.registry.ModItems
 import net.minecraft.item.Item
@@ -57,6 +58,21 @@ object SurvivalCosts {
     private val evBerries: Map<Stat, Item> by lazy {
         Registries.ITEM.filterIsInstance<FriendshipRaisingBerryItem>().associateBy { it.stat }
     }
+    /**
+     * 12 kẹo IV của Cobblemon (Health/Mighty/... Candy tăng, Sickly/Weak/... Candy giảm).
+     * Trong Cobblemon chúng là HyperTrainingItem với ivIncreaseAmount = +1 hoặc -1 và một chỉ số.
+     */
+    private val candiesUp: Map<Stat, Item> by lazy { candies(1) }
+    private val candiesDown: Map<Stat, Item> by lazy { candies(-1) }
+
+    // TODO(build): kiểm tra trong game là đủ 12 kẹo (Cobblemon 1.7.3 tạo chúng bằng hyperTrainingItem(id, ±1, setOf(stat), 0..31)).
+    private fun candies(amount: Int): Map<Stat, Item> =
+        Registries.ITEM.filterIsInstance<HyperTrainingItem>()
+            .filter { it.ivIncreaseAmount == amount && it.targetStats.size == 1 }
+            .associateBy { it.targetStats.first() }
+
+    fun candy(stat: Stat, up: Boolean): Item? = if (up) candiesUp[stat] else candiesDown[stat]
+
     private val mints: Map<String, Item> by lazy {
         Registries.ITEM.filterIsInstance<MintItem>().associateBy { it.nature.name.toString() }
     }
@@ -70,9 +86,16 @@ object SurvivalCosts {
     }
 
     fun mintFor(nature: String): Item? = mints[nature]
+    fun vitamin(stat: Stat): Item? = vitamins[stat]
+    fun feather(stat: Stat): Item? = feathers[stat]
+    fun evBerry(stat: Stat): Item? = evBerries[stat]
 
+    // ID vật phẩm của Only Bottle Caps (đối chiếu trong jar obc 1.3.0).
     fun bottleCapId(stat: Stat): String = "obc:bottle_cap_${CAP_SUFFIX[stat]}"
+    fun witheredCapId(stat: Stat): String = "obc:bottle_cap_${CAP_SUFFIX[stat]}_withered"
     const val GOLD_CAP_ID = "obc:bottle_cap_gold"
+    const val GOLD_WITHERED_CAP_ID = "obc:bottle_cap_gold_withered"
+    const val MIN_IV = 0
     fun tmId(move: String): String = "tmcraft:tm_$move"
 
     /**
@@ -110,18 +133,46 @@ object SurvivalCosts {
         return Result(lines, needed, problems, error)
     }
 
+    /**
+     * IV có hai phần, giống Cobblemon:
+     * - IV gốc: Bottle Cap đưa lên 31, Withered Bottle Cap đưa về 0 (Only Bottle Caps gọi Pokemon.setIV).
+     *   Gold / Gold Withered làm cả 6 chỉ số. Mod đó báo lỗi nếu không có chỉ số nào thay đổi.
+     * - IV hyper train (IV có hiệu lực): mỗi kẹo ±1, trong khoảng 0..31.
+     * Server áp dụng nắp trước rồi mới tới kẹo, nên số kẹo tính từ IV có hiệu lực sau khi dùng nắp.
+     */
     private fun addIvCosts(current: PokemonEditData, target: PokemonEditData, lines: MutableList<Line>): String? {
-        val changed = EDITOR_STATS.indices.filter { target.ivs[it] != current.ivs[it] }
-        if (changed.any { target.ivs[it] != MAX_IV }) return "survival_iv"
-        if (changed.isEmpty()) return if (target.useGoldCap) "survival_iv" else null
-        if (target.useGoldCap) {
-            if (target.ivs.any { it != MAX_IV }) return "survival_iv"
-            lines += Line("iv.gold", itemById(GOLD_CAP_ID), 1, GOLD_CAP_ID)
+        if (target.useGoldCap && target.useGoldWithered) return "survival_iv"
+        val gold = when {
+            target.useGoldCap -> MAX_IV
+            target.useGoldWithered -> MIN_IV
+            else -> null
+        }
+        if (gold != null) {
+            if (target.ivs.any { it != gold } || current.ivs.all { it == gold }) return "survival_iv"
+            val id = if (gold == MAX_IV) GOLD_CAP_ID else GOLD_WITHERED_CAP_ID
+            lines += Line("iv.gold", itemById(id), 1, id)
         } else {
-            changed.forEach { i ->
-                val id = bottleCapId(EDITOR_STATS[i])
+            EDITOR_STATS.forEachIndexed { i, stat ->
+                if (target.ivs[i] == current.ivs[i]) return@forEachIndexed
+                val id = when (target.ivs[i]) {
+                    MAX_IV -> bottleCapId(stat)
+                    MIN_IV -> witheredCapId(stat)
+                    else -> return "survival_iv"
+                }
                 lines += Line("iv.$i", itemById(id), 1, id)
             }
+        }
+
+        EDITOR_STATS.forEachIndexed { i, stat ->
+            val hyper = target.hyperIvs[i]
+            if (hyper == current.hyperIvs[i]) return@forEachIndexed
+            // Hyper bằng IV gốc thì Cobblemon xoá hyper (IVs.setHyperTrainedIV), nên phải ghi là NO_HYPER.
+            if (hyper != NO_HYPER && (hyper !in MIN_IV..MAX_IV || hyper == target.ivs[i])) return "survival_iv"
+            val from = current.hyperIvs[i].takeIf { it >= 0 } ?: target.ivs[i]
+            val to = target.effectiveIv(i)
+            if (from == to) return "survival_iv"
+            val up = to > from
+            lines += Line("iv.$i", candy(stat, up), kotlin.math.abs(to - from))
         }
         return null
     }
