@@ -3,8 +3,10 @@
   "id": "trainers_workshop",
   "version": "${version}",
   "name": "Trainer's Workshop",
-  "description": "Tools for Cobblemon trainers and server admins. Adds the Shiny Berry.",
-  "authors": ["Bubi274"],
+  "description": "Tools for Cobblemon trainers and server admins: Shiny Berry, PokeEditor and Trainer Editor.",
+  "authors": [
+    "Bubi274"
+  ],
   "license": "All-Rights-Reserved",
   "icon": "assets/trainers_workshop/icon.png",
   "environment": "*",
@@ -13,6 +15,12 @@
       {
         "adapter": "kotlin",
         "value": "io.github.bubi274.trainersworkshop.TrainersWorkshop"
+      }
+    ],
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "io.github.bubi274.trainersworkshop.client.TrainersWorkshopClient"
       }
     ]
   },

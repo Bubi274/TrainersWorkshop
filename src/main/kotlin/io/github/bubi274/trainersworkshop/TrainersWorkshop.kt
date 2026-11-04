@@ -2,7 +2,9 @@ package io.github.bubi274.trainersworkshop
 
 import io.github.bubi274.trainersworkshop.compat.RaidDensCompat
 import io.github.bubi274.trainersworkshop.config.WorkshopConfig
+import io.github.bubi274.trainersworkshop.editor.EditorSessions
 import io.github.bubi274.trainersworkshop.interaction.PokemonInteractionHandler
+import io.github.bubi274.trainersworkshop.network.EditorPayloads
 import io.github.bubi274.trainersworkshop.registry.ModCreativeTabs
 import io.github.bubi274.trainersworkshop.registry.ModItems
 import net.fabricmc.api.ModInitializer
@@ -22,6 +24,8 @@ object TrainersWorkshop : ModInitializer {
         ModItems.register()
         ModCreativeTabs.register()
         PokemonInteractionHandler.register()
+        EditorPayloads.register()
+        EditorSessions.register()
         RaidDensCompat.register()
     }
 }
