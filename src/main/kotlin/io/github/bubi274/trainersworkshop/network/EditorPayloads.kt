@@ -14,6 +14,7 @@ data class EditorStatePayload(val nbt: NbtCompound) : CustomPayload {
 
     companion object {
         val ID = CustomPayload.Id<EditorStatePayload>(TrainersWorkshop.id("editor_state"))
+        // TODO(build): chưa biên dịch được; kiểm tra PacketCodecs.UNLIMITED_NBT_COMPOUND có kiểu PacketCodec<ByteBuf, NbtCompound>.
         val CODEC: PacketCodec<ByteBuf, EditorStatePayload> =
             PacketCodecs.UNLIMITED_NBT_COMPOUND.xmap<EditorStatePayload>({ EditorStatePayload(it) }, { it.nbt })
     }

@@ -20,7 +20,10 @@ object SurvivalCosts {
     const val MAX_IV = 31
     const val EV_PER_VITAMIN = 10
     const val EV_PER_FEATHER = 1
-    /** Berry giảm EV (Pomeg, Kelpsy...) giảm 10 mỗi quả (mặc định của Cobblemon). */
+    /**
+     * Berry giảm EV (Pomeg, Kelpsy...) giảm 10 mỗi quả.
+     * TODO(api): Cobblemon đọc mức giảm từ cấu hình cơ chế berry (getEvLowerAmount); ở đây cố định 10 theo yêu cầu.
+     */
     const val EV_PER_BERRY = 10
 
     /** Một dòng chi phí, gắn với phần đang chỉnh (để tô đỏ đúng chỗ). */

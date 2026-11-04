@@ -231,9 +231,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             return
         }
         val aspects = data.aspects.toMutableSet()
+        // TODO(api): giả định aspect shiny của Cobblemon tên là "shiny" (để xem trước model shiny).
         if (data.shiny) aspects.add("shiny") else aspects.remove("shiny")
         val key = "${data.uuid}|${data.species}|${aspects.sorted()}"
         if (key != modelKey || modelWidget == null) {
+            // TODO(ui): baseScale/rotationY/offsetY lấy theo màn hình Summary của Cobblemon, chưa xem thử trong game.
             modelWidget = ModelWidget(
                 pX = left + 6, pY = top + 31, pWidth = 66, pHeight = 66,
                 pokemon = RenderablePokemon(species, aspects, ItemStack.EMPTY),
@@ -292,6 +294,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         GuiKit.text(context, textRenderer, GuiKit.ballName(data.ball), x, top + 137, GuiKit.GRAY, scale = 0.5f)
     }
 
+    // TODO(ui): toạ độ các panel đo từ texture summary_base.png (331x161), cần chỉnh lại sau khi xem trong game.
     /** Ô đội hình: 2 cột x 3 hàng ở panel phải. */
     private fun partySlotPos(position: Int): Pair<Int, Int> = Pair(left + 215 + (position % 2) * 57, top + 21 + (position / 2) * 18)
 

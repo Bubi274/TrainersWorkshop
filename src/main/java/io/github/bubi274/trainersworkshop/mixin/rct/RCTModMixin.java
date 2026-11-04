@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 /**
  * Khi RCT bắt đầu trận đấu, dùng đội đã chỉnh của đúng trainer này (nếu có).
  * makeBattle gọi TrainerRegistry.getById hai lần: lần 0 cho người chơi, lần 1 cho trainer.
+ * TODO(rct): đúng với rctmod 0.18.1-beta; bản RCT khác có thể đổi thứ tự (ordinal) này.
  */
 @Mixin(targets = "com.gitlab.srcmc.rctmod.api.RCTMod", remap = false)
 public abstract class RCTModMixin {

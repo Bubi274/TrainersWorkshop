@@ -49,6 +49,7 @@ object GuiKit {
         text(ctx, renderer, text, centerX.toFloat() - width / 2f, y, color, scale)
     }
 
+    // TODO(ui): giả định summary_move.png (108x44) gồm 2 ô 108x22 (thường / khi rê chuột).
     /** Ô chiêu của Cobblemon, tô màu theo hệ. */
     fun moveSlot(ctx: DrawContext, x: Int, y: Int, hue: Int, hovered: Boolean) {
         val r = ((hue shr 16) and 0xFF) / 255f

@@ -81,6 +81,7 @@ object RctAccess {
         }
         val original = registry.getById(mob.trainerId, TrainerNPC::class.java) ?: return null
         val pokemon = team.map { Pokemon.loadFromNBT(server.registryManager, it) }.toTypedArray()
+        // TODO(rct): gimmick (Mega/Tera/Dynamax) gắn theo UUID Pokémon gốc, nên đội đã chỉnh thường mất gimmick.
         val npc = TrainerNPC(
             original.name,
             pokemon,
