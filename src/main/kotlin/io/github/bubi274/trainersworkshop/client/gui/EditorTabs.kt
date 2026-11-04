@@ -1,7 +1,10 @@
 package io.github.bubi274.trainersworkshop.client.gui
 
 import com.cobblemon.mod.common.api.abilities.Abilities
+import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokemon.Natures
+import com.cobblemon.mod.common.client.gui.MoveCategoryIcon
+import com.cobblemon.mod.common.client.gui.TypeIcon
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.editor.EDITOR_STATS
 import io.github.bubi274.trainersworkshop.editor.EditorMode
@@ -9,23 +12,33 @@ import io.github.bubi274.trainersworkshop.editor.MOVE_SLOTS
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
+import net.minecraft.client.gui.widget.TextFieldWidget
 import net.minecraft.text.Text
+import net.minecraft.util.Identifier
 import kotlin.math.max
 import kotlin.math.min
 
 private const val MOD = TrainersWorkshop.MOD_ID
-private const val MAX_IV = 31
-private const val MAX_EV = 252
-private const val MAX_EV_TOTAL = 510
+internal const val MAX_IV = 31
+internal const val MAX_EV = 252
+internal const val MAX_EV_TOTAL = 510
 
 fun gui(key: String, vararg args: Any): Text = Text.translatable("gui.$MOD.$key", *args)
 
 /** Một tab ở panel giữa. Các nút được tạo lại mỗi khi bản nháp thay đổi (xem EditorScreen.rebuild). */
 abstract class EditorTab(protected val screen: EditorScreen) {
     abstract val title: Text
+    /** Icon 17x17 của tab (SummaryTab vẽ ở cỡ 0.5, kèm tooltip là [title]). */
+    open val icon: Identifier = GuiKit.TAB_INFO
     /** Tab chỉ hiện khi có Pokémon đang chọn (tab đồ rơi thì không cần). */
     open val needsPokemon = true
     open fun init() {}
+    /** Thoát khỏi danh sách chọn đang mở (khi đổi tab hoặc đổi Pokémon). */
+    open fun reset() {}
+    /** Nền panel giữa, vẽ trước các nút. */
+    open fun renderBackdrop(context: DrawContext) {
+        GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
+    }
     open fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {}
     open fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = false
     open fun mouseScrolled(mouseX: Double, mouseY: Double, amount: Double): Boolean = false
@@ -33,12 +46,24 @@ abstract class EditorTab(protected val screen: EditorScreen) {
     protected val draft: PokemonEditData get() = screen.draft!!
     protected val creative: Boolean get() = screen.mode != EditorMode.SURVIVAL
     protected val step: Int get() = if (Screen.hasShiftDown()) 10 else 1
+
+    protected fun drawTexturePanel(context: DrawContext, texture: Identifier) {
+        context.drawTexture(texture, screen.panelX, screen.panelY, 0f, 0f, GuiKit.PANEL_W, GuiKit.PANEL_H, GuiKit.PANEL_W, GuiKit.PANEL_H)
+    }
+
+    protected fun hoverTooltip(context: DrawContext, mouseX: Int, mouseY: Int, x: Int, y: Int, w: Int, h: Int, text: Text) {
+        if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, w, h)) context.drawTooltip(screen.font, text, mouseX, mouseY)
+    }
 }
 
 /** Danh sách cuộn đơn giản: mỗi hàng cao [rowHeight], cuộn bằng con lăn chuột. */
 class RowList(val rows: Int, val rowHeight: Int = 11) {
     var scroll = 0
         private set
+
+    fun reset() {
+        scroll = 0
+    }
 
     fun clamp(size: Int) {
         scroll = scroll.coerceIn(0, max(0, size - rows))
@@ -66,42 +91,108 @@ class RowList(val rows: Int, val rowHeight: Int = 11) {
         val height = rows * rowHeight
         val barHeight = max(8, height * rows / size)
         val barY = y + (height - barHeight) * scroll / max(1, size - rows)
-        context.fill(x, y, x + 2, y + height, 0x40000000)
-        context.fill(x, barY, x + 2, barY + barHeight, 0xFFAAAAAA.toInt())
+        context.fill(x, y, x + 2, y + height, GuiKit.DARK)
+        context.fill(x, barY, x + 2, barY + barHeight, GuiKit.EDGE)
     }
 }
 
-/** IV và EV của 6 chỉ số. Creative: bấm để ±1, giữ Shift để ±10. */
-open class StatsTab(screen: EditorScreen) : EditorTab(screen) {
+/**
+ * Nền chung của các tab dạng "ô nhãn tối + ô giá trị sáng" (summary_info_base.png, 134x148):
+ * 6 hàng cao 11 px, cách nhau 15 px, bắt đầu ở y=5; ô nhãn x=5..49, ô giá trị x=50..128.
+ */
+abstract class InfoRowsTab(screen: EditorScreen) : EditorTab(screen) {
+    protected fun rowY(row: Int) = screen.panelY + 5 + row * 15
+    protected val labelX get() = screen.panelX + 5
+    protected val cellX get() = screen.panelX + 50
+    protected val cellW = 79
+    /** Vùng sáng phía dưới 6 hàng (y=91..112): nút phụ, tổng EV, ghi chú. */
+    protected val zoneY get() = screen.panelY + 91
+
+    override fun renderBackdrop(context: DrawContext) = drawTexturePanel(context, GuiKit.INFO_BASE)
+
+    protected fun drawLabel(context: DrawContext, row: Int, text: Text, color: Int = GuiKit.WHITE) {
+        GuiKit.text(context, screen.font, text, labelX + 3, rowY(row) + 1, color, maxWidth = 39, minScale = GuiKit.MEDIUM)
+    }
+}
+
+/** IV và EV của 6 chỉ số, giống tab Stats của Summary: 6 hàng + thanh chọn trang "IVs | EVs" ở dưới cùng. */
+abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
     override val title: Text = gui("tab.stats")
+    override val icon: Identifier = GuiKit.TAB_STATS
 
-    protected fun rowY(row: Int) = screen.contentY + 14 + row * 18
+    protected var showEvs = false
 
-    override fun init() {
-        val x = screen.contentX
-        EDITOR_STATS.indices.forEach { row ->
-            val y = rowY(row)
-            initIvButtons(row, x, y)
-            initEvButtons(row, x, y)
+    protected fun initPageButtons() {
+        val y = screen.panelY + 123
+        screen.button(gui("button.tab_ivs"), screen.panelX + 5, y, 61, 20) { showEvs = false; screen.rebuild() }.selected = !showEvs
+        screen.button(gui("button.tab_evs"), screen.panelX + 70, y, 59, 20) { showEvs = true; screen.rebuild() }.selected = showEvs
+    }
+
+    /** Đỏ nếu nature làm tăng chỉ số này, xanh nếu làm giảm (như Summary). */
+    protected fun statColor(row: Int): Int {
+        val (up, down) = GuiKit.natureStats(draft.effectiveNature) ?: return GuiKit.WHITE
+        return when (EDITOR_STATS[row]) {
+            up -> GuiKit.STAT_UP
+            down -> GuiKit.STAT_DOWN
+            else -> GuiKit.WHITE
         }
-        initFooter(x, screen.contentY + 124)
     }
 
-    protected open fun initIvButtons(row: Int, x: Int, y: Int) {
+    protected fun drawStatLabels(context: DrawContext) {
+        EDITOR_STATS.forEachIndexed { row, stat ->
+            drawLabel(context, row, Text.literal(GuiKit.longStat(stat)), statColor(row))
+            val pair = GuiKit.natureStats(draft.effectiveNature)
+            val icon = when (stat) {
+                pair?.first -> GuiKit.STAT_UP_ICON
+                pair?.second -> GuiKit.STAT_DOWN_ICON
+                else -> null
+            }
+            if (icon != null) context.drawTexture(icon, labelX + 36, rowY(row) + 2, 0f, 0f, 8, 6, 8, 6)
+        }
+    }
+
+    /** Số ở trên, thanh giá trị mảnh ở dưới, trong vùng [x, x+w) của ô giá trị. */
+    protected fun drawValue(context: DrawContext, row: Int, x: Int, w: Int, text: String, color: Int, value: Int, max: Int, barColor: Int = 0x55AA55) {
+        GuiKit.textCentered(context, screen.font, Text.literal(text), x + w / 2f, rowY(row) + 1, color, maxWidth = w, minScale = GuiKit.MEDIUM)
+        GuiKit.bar(context, x + 1, rowY(row) + 9, w - 2, 2, value, max, barColor)
+    }
+
+    /** Thanh tổng EV "EV total: 14 / 510" ở vùng sáng dưới 6 hàng. */
+    protected fun drawEvMeter(context: DrawContext, y: Int) {
+        val x = screen.panelX + 7
+        val total = draft.evs.sum()
+        GuiKit.bar(context, x, y, 120, 10, total, MAX_EV_TOTAL, if (total >= MAX_EV_TOTAL) GuiKit.GOLD else 0x3F8F3F)
+        context.drawBorder(x, y, 120, 10, GuiKit.EDGE)
+        GuiKit.textCentered(context, screen.font, gui("ev_total", total, MAX_EV_TOTAL), x + 60, y + 1, maxWidth = 116, minScale = GuiKit.MEDIUM)
+    }
+
+    protected fun changedColor(value: Int, original: Int?) = if (original != null && value != original) GuiKit.GOLD else GuiKit.WHITE
+}
+
+/** Bản creative / Trainer Editor: bấm để ±1, giữ Shift để ±10. */
+open class StatsTab(screen: EditorScreen) : StatPageTab(screen) {
+    override fun init() {
+        initPageButtons()
+        EDITOR_STATS.indices.forEach { row -> if (showEvs) initEvButtons(row) else initIvButtons(row) }
+        if (showEvs) {
+            screen.button(gui("button.clear_evs"), screen.panelX + 37, zoneY + 12, 60, 9) { screen.edit { it.copy(evs = List(6) { 0 }) } }
+        } else {
+            screen.button(gui("button.max_ivs"), screen.panelX + 7, zoneY + 4, 120, 14) { screen.edit { it.copy(ivs = List(6) { MAX_IV }) } }
+        }
+    }
+
+    private fun initIvButtons(row: Int) {
         val iv = draft.ivs[row]
-        screen.button(Text.literal("-"), x + 26, y, 10, 12, gui("hint.step"), active = iv > 0) { changeIv(row, -step) }
-        screen.button(Text.literal("+"), x + 50, y, 10, 12, gui("hint.step"), active = iv < MAX_IV) { changeIv(row, step) }
+        val y = rowY(row) + 1
+        screen.button(Text.literal("-"), cellX + 2, y, 9, 9, gui("hint.step"), active = iv > 0) { changeIv(row, -step) }
+        screen.button(Text.literal("+"), cellX + 68, y, 9, 9, gui("hint.step"), active = iv < MAX_IV) { changeIv(row, step) }
     }
 
-    protected open fun initEvButtons(row: Int, x: Int, y: Int) {
+    private fun initEvButtons(row: Int) {
         val ev = draft.evs[row]
-        screen.button(Text.literal("-"), x + 70, y, 10, 12, gui("hint.step"), active = ev > 0) { changeEv(row, -step) }
-        screen.button(Text.literal("+"), x + 108, y, 10, 12, gui("hint.step"), active = ev < MAX_EV && draft.evs.sum() < MAX_EV_TOTAL) { changeEv(row, step) }
-    }
-
-    protected open fun initFooter(x: Int, y: Int) {
-        screen.button(gui("button.max_ivs"), x, y, 62, 12) { screen.edit { it.copy(ivs = List(6) { MAX_IV }) } }
-        screen.button(gui("button.clear_evs"), x + 66, y, 62, 12) { screen.edit { it.copy(evs = List(6) { 0 }) } }
+        val y = rowY(row) + 1
+        screen.button(Text.literal("-"), cellX + 2, y, 9, 9, gui("hint.step"), active = ev > 0) { changeEv(row, -step) }
+        screen.button(Text.literal("+"), cellX + 68, y, 9, 9, gui("hint.step"), active = ev < MAX_EV && draft.evs.sum() < MAX_EV_TOTAL) { changeEv(row, step) }
     }
 
     protected fun changeIv(row: Int, delta: Int) = screen.edit { data ->
@@ -116,36 +207,32 @@ open class StatsTab(screen: EditorScreen) : EditorTab(screen) {
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
-        val x = screen.contentX
-        val font = screen.font
-        GuiKit.text(context, font, gui("stat"), x, screen.contentY + 2, GuiKit.GRAY, 0.75f)
-        GuiKit.centeredText(context, font, Text.literal("IV"), x + 43, screen.contentY + 2, GuiKit.GRAY, 0.75f)
-        GuiKit.centeredText(context, font, Text.literal("EV"), x + 94, screen.contentY + 2, GuiKit.GRAY, 0.75f)
-        EDITOR_STATS.forEachIndexed { row, stat ->
-            val y = rowY(row) + 3
-            GuiKit.text(context, font, Text.literal(GuiKit.shortStat(stat)), x, y, scale = 0.75f)
-            GuiKit.centeredText(context, font, Text.literal(draft.ivs[row].toString()), ivValueX(x), y, ivColor(row), 0.75f)
-            GuiKit.centeredText(context, font, Text.literal(draft.evs[row].toString()), x + 94, y, evColor(row), 0.75f)
+        drawStatLabels(context)
+        val original = screen.selectedSlot?.data
+        EDITOR_STATS.indices.forEach { row ->
+            if (showEvs) {
+                drawValue(context, row, cellX + 12, 55, "${draft.evs[row]} / $MAX_EV", changedColor(draft.evs[row], original?.evs?.get(row)), draft.evs[row], MAX_EV)
+            } else {
+                drawValue(context, row, cellX + 12, 55, "${draft.ivs[row]} / $MAX_IV", changedColor(draft.ivs[row], original?.ivs?.get(row)), draft.ivs[row], MAX_IV)
+            }
         }
-        GuiKit.text(context, font, gui("ev_total", draft.evs.sum(), MAX_EV_TOTAL), x, screen.contentY + 117, GuiKit.GRAY, 0.5f)
+        if (showEvs) drawEvMeter(context, zoneY + 1)
     }
-
-    protected open fun ivValueX(x: Int) = x + 43
-    protected open fun ivColor(row: Int) = changedColor(draft.ivs[row], screen.selectedSlot?.data?.ivs?.get(row))
-    protected open fun evColor(row: Int) = changedColor(draft.evs[row], screen.selectedSlot?.data?.evs?.get(row))
-
-    protected fun changedColor(value: Int, original: Int?) = if (original != null && value != original) GuiKit.GOLD else GuiKit.WHITE
 }
 
-/** 4 ô chiêu; bấm vào một ô để chọn chiêu khác từ danh sách. */
+/** 4 ô chiêu (kiểu MoveSlotWidget của Cobblemon); bấm vào một ô để chọn chiêu khác từ danh sách có ô tìm kiếm. */
 open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
     override val title: Text = gui("tab.moves")
+    override val icon: Identifier = GuiKit.TAB_MOVES
 
     protected var pickingSlot = -1
-    protected val list = RowList(rows = 10)
+    protected var search = ""
+    private var focusSearch = false
+    protected val list = RowList(rows = 7, rowHeight = 12)
 
-    private val listX get() = screen.contentX
-    private val listY get() = screen.contentY + 12
+    private val listX get() = screen.panelX + 7
+    private val listY get() = screen.panelY + 22
+    private val listWidth = 117
 
     /** Chiêu có thể chọn cho ô đang chọn (bỏ các chiêu đang nằm ở ô khác). */
     protected open fun candidates(): List<String> {
@@ -154,80 +241,162 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
         return options.legalMoves.filter { it !in others }
     }
 
+    /** Danh sách sau khi lọc theo ô tìm kiếm (lọc lúc vẽ, không cần dựng lại nút). */
+    private fun filtered(): List<String> {
+        val query = search.trim().lowercase()
+        val all = candidates()
+        if (query.isEmpty()) return all
+        return all.filter { GuiKit.moveName(it).string.lowercase().contains(query) || it.lowercase().contains(query) }
+    }
+
     /** Có được chọn chiêu này không (survival kiểm tra TM). */
     protected open fun isSelectable(move: String) = true
 
-    /** Nhãn phụ bên phải mỗi hàng (survival: free/TM). */
+    /** Nhãn phụ bên phải mỗi hàng (survival: miễn phí / TM). */
     protected open fun rowTag(move: String): Pair<Text, Int>? = null
 
+    /** Dòng chú thích dưới danh sách chọn chiêu (survival giải thích các nhãn). */
+    protected open fun pickerNote(): Text? = null
+
+    override fun reset() {
+        pickingSlot = -1
+        search = ""
+    }
+
+    private fun beginPicking(slot: Int) {
+        pickingSlot = slot
+        search = ""
+        focusSearch = true
+        list.reset()
+        screen.rebuild()
+    }
+
+    private fun endPicking() {
+        pickingSlot = -1
+        screen.rebuild()
+    }
+
     override fun init() {
-        if (pickingSlot >= 0) {
-            screen.button(gui("button.back"), screen.contentX, screen.contentY + 126, 40, 12) {
-                pickingSlot = -1
-                screen.rebuild()
-            }
+        if (pickingSlot < 0) return
+        screen.button(gui("button.back"), screen.panelX + 7, screen.panelY + 118, 56, 20) { endPicking() }
+        val field = TextFieldWidget(screen.font, screen.panelX + 7, screen.panelY + 6, listWidth + 3, 12, gui("search"))
+        field.setMaxLength(32)
+        field.setPlaceholder(gui("search"))
+        field.text = search
+        field.setChangedListener {
+            search = it
+            list.reset()
         }
+        screen.addWidget(field)
+        if (focusSearch) {
+            screen.focusWidget(field)
+            focusSearch = false
+        }
+    }
+
+    override fun renderBackdrop(context: DrawContext) {
+        drawTexturePanel(context, GuiKit.MOVES_BASE)
+        // Danh sách chọn chiêu che vùng 4 ô chiêu bằng nền sáng của panel.
+        if (pickingSlot >= 0) context.fill(screen.panelX + 5, screen.panelY + 5, screen.panelX + 129, screen.panelY + 112, GuiKit.LIGHT)
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         if (pickingSlot >= 0) renderPicker(context, mouseX, mouseY) else renderSlots(context, mouseX, mouseY)
     }
 
-    private fun slotY(i: Int) = screen.contentY + 6 + i * 26
+    private fun slotX() = screen.panelX + 13
+    private fun slotY(i: Int) = screen.panelY + 6 + i * 25
 
     private fun renderSlots(context: DrawContext, mouseX: Int, mouseY: Int) {
-        val x = screen.contentX + 10
+        val font = screen.font
         val original = screen.selectedSlot?.data?.moves
+        var hoveredMove: String? = null
         for (i in 0 until MOVE_SLOTS) {
+            val x = slotX()
             val y = slotY(i)
             val move = draft.moves[i]
             val hovered = GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, GuiKit.MOVE_WIDTH, GuiKit.MOVE_HEIGHT)
+            if (hovered && move.isNotEmpty()) hoveredMove = move
+            val template = if (move.isEmpty()) null else Moves.getByName(move)
             GuiKit.moveSlot(context, x, y, if (move.isEmpty()) 0x606060 else GuiKit.moveHue(move), hovered)
-            val name = if (move.isEmpty()) gui("empty") else GuiKit.moveName(move)
-            val color = if (original != null && original[i] != move) GuiKit.GOLD else GuiKit.WHITE
-            GuiKit.text(context, screen.font, name, x + 6, y + 7, color, 0.75f)
-            rowTag(move)?.takeIf { original != null && original[i] != move }?.let { (tag, tagColor) ->
-                GuiKit.text(context, screen.font, tag, x + 80, y + 8, tagColor, 0.5f)
+            val changed = original != null && original[i] != move
+            val nameColor = if (changed) GuiKit.GOLD else GuiKit.WHITE
+            if (template == null) {
+                GuiKit.text(context, font, if (move.isEmpty()) gui("empty") else Text.literal(move), x + 28, y + 2, if (move.isEmpty()) GuiKit.GRAY else nameColor, maxWidth = 76, minScale = GuiKit.MEDIUM)
+                continue
             }
+            val tag = rowTag(move)?.takeIf { changed }
+            val tagWidth = tag?.let { GuiKit.textWidth(font, it.first, GuiKit.SMALL, small = true).toInt() + 3 } ?: 0
+            // Cùng toạ độ MoveSlotWidget: icon hệ (+2,+2), tên (+28,+2), icon loại đòn (+66,+13.5), PP (+93,+13).
+            TypeIcon(x = x + 2, y = y + 2, type = template.elementalType, secondaryType = null).render(context)
+            GuiKit.text(context, font, GuiKit.moveName(move), x + 28, y + 2, nameColor, maxWidth = 76 - tagWidth, minScale = GuiKit.MEDIUM)
+            val power = template.power.toInt()
+            GuiKit.text(context, font, gui("power", if (power > 0) power.toString() else "-"), x + 28, y + 13, GuiKit.GRAY, maxWidth = 36, minScale = GuiKit.MEDIUM)
+            MoveCategoryIcon(x = x + 66, y = y + 13.5f, category = template.damageCategory).render(context)
+            GuiKit.textRight(context, font, gui("pp", template.pp), x + 105, y + 13, GuiKit.GRAY, maxWidth = 24, minScale = GuiKit.MEDIUM)
+            if (tag != null) GuiKit.textRight(context, font, tag.first, x + 105, y + 4, tag.second, maxWidth = tagWidth, small = true)
         }
-        GuiKit.text(context, screen.font, gui("hint.moves"), screen.contentX, screen.contentY + 112, GuiKit.GRAY, 0.5f)
+        renderMoveDetails(context, hoveredMove)
+        GuiKit.textWrapped(context, font, gui("hint.moves"), screen.panelX + 72, screen.panelY + 116, 54, 4, GuiKit.GRAY)
+    }
+
+    /** Ba thanh nhỏ ở góc trái dưới panel: sức mạnh, độ chính xác, PP của chiêu đang rê chuột. */
+    private fun renderMoveDetails(context: DrawContext, move: String?) {
+        val template = move?.let { Moves.getByName(it) } ?: return
+        val power = template.power.toInt()
+        val accuracy = template.accuracy
+        val lines = listOf(
+            gui("power_full", if (power > 0) power.toString() else "-"),
+            gui("accuracy", if (accuracy > 0 && accuracy <= 100) accuracy.toInt().toString() else "-"),
+            gui("pp", template.pp),
+        )
+        lines.forEachIndexed { i, line ->
+            GuiKit.text(context, screen.font, line, screen.panelX + 9, screen.panelY + 114f + i * 11, scale = GuiKit.MEDIUM, maxWidth = 52, minScale = 0.6f)
+        }
     }
 
     private fun renderPicker(context: DrawContext, mouseX: Int, mouseY: Int) {
-        val moves = candidates()
-        GuiKit.text(context, screen.font, gui("choose_move", pickingSlot + 1), listX, screen.contentY + 2, GuiKit.GRAY, 0.75f)
+        val font = screen.font
+        val moves = filtered()
+        val all = candidates().size
         for (index in list.visible(moves.size)) {
             val move = moves[index]
             val y = listY + (index - list.scroll) * list.rowHeight
-            if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), listX, y, screen.contentWidth - 4, list.rowHeight)) {
-                context.fill(listX, y, listX + screen.contentWidth - 4, y + list.rowHeight, GuiKit.ROW_HIGHLIGHT)
+            val hovered = GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), listX, y, listWidth, list.rowHeight)
+            context.fill(listX, y, listX + listWidth, y + list.rowHeight - 1, if (hovered) GuiKit.FRAME else GuiKit.DARK)
+            val template = Moves.getByName(move)
+            if (template != null) {
+                TypeIcon(x = listX + 1, y = y + 1, type = template.elementalType, secondaryType = null, centeredX = false, small = true).render(context)
+                MoveCategoryIcon(x = listX + listWidth - 13, y = y + 2f, category = template.damageCategory).render(context)
             }
-            context.fill(listX + 1, y + 2, listX + 7, y + 8, 0xFF000000.toInt() or GuiKit.moveHue(move))
+            val tag = rowTag(move)
+            val tagWidth = tag?.let { GuiKit.textWidth(font, it.first, GuiKit.SMALL, small = true).toInt() + 3 } ?: 0
             val color = when {
                 move == draft.moves[pickingSlot] -> GuiKit.GOLD
                 isSelectable(move) -> GuiKit.WHITE
                 else -> GuiKit.RED
             }
-            GuiKit.text(context, screen.font, GuiKit.moveName(move), listX + 10, y + 2, color, 0.75f)
-            rowTag(move)?.let { (tag, tagColor) -> GuiKit.text(context, screen.font, tag, listX + 100, y + 3, tagColor, 0.5f) }
+            GuiKit.text(context, font, GuiKit.moveName(move), listX + 13, y + 1.5f, color, maxWidth = listWidth - 13 - 14 - tagWidth, minScale = GuiKit.MEDIUM)
+            if (tag != null) GuiKit.textRight(context, font, tag.first, listX + listWidth - 15, y + 4, tag.second, maxWidth = tagWidth, small = true)
         }
-        list.drawScrollbar(context, listX + screen.contentWidth - 3, listY, moves.size)
+        if (moves.isEmpty()) GuiKit.textCentered(context, font, gui("no_results"), listX + listWidth / 2, listY + 8, GuiKit.GRAY, maxWidth = listWidth)
+        list.drawScrollbar(context, listX + listWidth + 1, listY, moves.size)
+        GuiKit.text(context, font, gui("moves_count", moves.size, all), screen.panelX + 72, screen.panelY + 116, GuiKit.GRAY, maxWidth = 54, small = true)
+        pickerNote()?.let { GuiKit.textWrapped(context, font, it, screen.panelX + 72, screen.panelY + 124, 54, 3, GuiKit.DIM) }
     }
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         if (pickingSlot < 0) {
-            val x = screen.contentX + 10
             for (i in 0 until MOVE_SLOTS) {
-                if (GuiKit.inside(mouseX, mouseY, x, slotY(i), GuiKit.MOVE_WIDTH, GuiKit.MOVE_HEIGHT)) {
-                    pickingSlot = i
-                    screen.rebuild()
+                if (GuiKit.inside(mouseX, mouseY, slotX(), slotY(i), GuiKit.MOVE_WIDTH, GuiKit.MOVE_HEIGHT)) {
+                    beginPicking(i)
                     return true
                 }
             }
             return false
         }
-        val moves = candidates()
-        val index = list.hit(mouseX, mouseY, listX, listY, screen.contentWidth - 4, moves.size)
+        val moves = filtered()
+        val index = list.hit(mouseX, mouseY, listX, listY, listWidth, moves.size)
         if (index < 0 || !isSelectable(moves[index])) return false
         val slot = pickingSlot
         pickingSlot = -1
@@ -237,122 +406,215 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, amount: Double): Boolean {
         if (pickingSlot < 0) return false
-        list.scrollBy(amount, candidates().size)
+        list.scrollBy(amount, filtered().size)
         return true
     }
 }
 
-/** Danh sách 25 nature. */
+/**
+ * Lưới 25 nature, 2 cột x 13 hàng (không cần cuộn). Mỗi ô: tên + ▲chỉ số tăng (đỏ) / ▼chỉ số giảm (xanh).
+ * Nature hiện tại của Pokémon có viền vàng, nature đang chọn có nền sáng.
+ */
 open class NatureTab(screen: EditorScreen) : EditorTab(screen) {
     override val title: Text = gui("tab.nature")
+    override val icon: Identifier = GuiKit.TAB_NATURE
 
-    protected val list = RowList(rows = 11)
     protected val natures: List<String> by lazy {
         Natures.all().map { it.name.toString() }.sortedBy { GuiKit.natureName(it).string }
     }
 
-    private val listX get() = screen.contentX
-    private val listY get() = screen.contentY + 12
+    private val rows = 13
+    private val cellW = 61
+    private val cellH = 8
+    private fun cellX(index: Int) = screen.panelX + 5 + (index / rows) * (cellW + 1)
+    private fun cellY(index: Int) = screen.panelY + 5 + (index % rows) * (cellH + 1)
 
     /** Nature đang được chọn trong bản nháp. */
-    protected open fun chosen(): String = draft.nature
+    protected open fun chosen(): String = draft.effectiveNature
 
     protected open fun isSelectable(nature: String) = true
-    protected open fun rowTag(nature: String): Pair<Text, Int>? = null
+
+    /** Dòng chi phí dưới lưới (survival: "Requires Timid Mint (have 1)"). */
+    protected open fun costLine(): Pair<Text, Int>? = null
+
     protected open fun choose(nature: String) = screen.edit { it.copy(nature = nature, mintedNature = "") }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
-        GuiKit.text(context, screen.font, gui("current_nature", GuiKit.natureName(screen.selectedSlot?.data?.effectiveNature ?: "")), listX, screen.contentY + 2, GuiKit.GRAY, 0.75f)
-        for (index in list.visible(natures.size)) {
-            val nature = natures[index]
-            val y = listY + (index - list.scroll) * list.rowHeight
-            if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), listX, y, screen.contentWidth - 4, list.rowHeight)) {
-                context.fill(listX, y, listX + screen.contentWidth - 4, y + list.rowHeight, GuiKit.ROW_HIGHLIGHT)
-            }
-            val color = when {
-                nature == chosen() -> GuiKit.GOLD
+        val font = screen.font
+        val current = screen.selectedSlot?.data?.effectiveNature ?: ""
+        natures.forEachIndexed { index, nature ->
+            val x = cellX(index)
+            val y = cellY(index)
+            val hovered = GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, cellW, cellH)
+            val isChosen = nature == chosen()
+            context.fill(x, y, x + cellW, y + cellH, if (isChosen) GuiKit.SELECTED_FILL else if (hovered && isSelectable(nature)) GuiKit.FRAME else GuiKit.DARK)
+            if (nature == current) context.drawBorder(x, y, cellW, cellH, 0xFF000000.toInt() or GuiKit.GOLD)
+            val nameColor = when {
+                nature == current -> GuiKit.GOLD
                 isSelectable(nature) -> GuiKit.WHITE
                 else -> GuiKit.RED
             }
-            GuiKit.text(context, screen.font, GuiKit.natureName(nature), listX + 2, y + 2, color, 0.75f)
-            GuiKit.text(context, screen.font, Text.literal(GuiKit.natureEffect(nature)), listX + 60, y + 3, GuiKit.GRAY, 0.5f)
-            rowTag(nature)?.let { (tag, tagColor) -> GuiKit.text(context, screen.font, tag, listX + 100, y + 3, tagColor, 0.5f) }
+            GuiKit.text(context, font, GuiKit.natureName(nature), x + 2, y + 1, nameColor, scale = GuiKit.MEDIUM, maxWidth = 27, minScale = 0.6f)
+            val stats = GuiKit.natureStats(nature)
+            if (stats == null) {
+                GuiKit.text(context, font, Text.literal("-"), x + 36, y + 1, GuiKit.DIM, scale = GuiKit.MEDIUM)
+            } else {
+                GuiKit.text(context, font, Text.literal("▲" + GuiKit.shortStat(stats.first)), x + 29, y + 1, GuiKit.STAT_UP, scale = 0.65f, maxWidth = 16, minScale = 0.5f)
+                GuiKit.text(context, font, Text.literal("▼" + GuiKit.shortStat(stats.second)), x + 45, y + 1, GuiKit.STAT_DOWN, scale = 0.65f, maxWidth = 15, minScale = 0.5f)
+            }
         }
-        list.drawScrollbar(context, listX + screen.contentWidth - 3, listY, natures.size)
+        val textX = screen.panelX + 7
+        val textY = screen.panelY + 123
+        GuiKit.text(context, font, gui("current_nature", GuiKit.natureName(current)), textX, textY, GuiKit.GRAY, scale = GuiKit.MEDIUM, maxWidth = 120, minScale = 0.6f)
+        if (chosen() != current) {
+            GuiKit.text(context, font, gui("selected_nature", GuiKit.natureName(chosen()), GuiKit.natureEffect(chosen())), textX, textY + 8, scale = GuiKit.MEDIUM, maxWidth = 120, minScale = 0.6f)
+        }
+        costLine()?.let { (line, color) -> GuiKit.text(context, font, line, textX, textY + 16, color, scale = GuiKit.MEDIUM, maxWidth = 120, minScale = 0.6f) }
     }
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
-        val index = list.hit(mouseX, mouseY, listX, listY, screen.contentWidth - 4, natures.size)
-        if (index < 0 || !isSelectable(natures[index])) return false
-        choose(natures[index])
+        natures.forEachIndexed { index, nature ->
+            if (GuiKit.inside(mouseX, mouseY, cellX(index), cellY(index), cellW, cellH)) {
+                if (!isSelectable(nature)) return false
+                choose(nature)
+                return true
+            }
+        }
+        return false
+    }
+}
+
+/** Shiny, ability, giới tính, level, loại bóng: mỗi hàng là ô nhãn tối + ô giá trị sáng. */
+open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
+    override val title: Text = gui("tab.other")
+    override val icon: Identifier = GuiKit.TAB_OTHER
+
+    private var pickingBall = false
+
+    override fun reset() {
+        pickingBall = false
+    }
+    private val ballList = RowList(rows = 8, rowHeight = 12)
+    private val ballListX get() = screen.panelX + 7
+    private val ballListY get() = screen.panelY + 22
+
+    override fun init() {
+        if (pickingBall) {
+            screen.button(gui("button.back"), screen.panelX + 7, screen.panelY + 122, 56, 16) { pickingBall = false; screen.rebuild() }
+            return
+        }
+        val options = screen.selectedSlot?.options ?: return
+        initShiny(cellX + 2, rowY(0) + 1, cellW - 4)
+        if (!creative) return
+
+        screen.button(abilityLabel(draft.ability), cellX + 2, rowY(1) + 1, cellW - 4, 9, gui("hint.cycle")) {
+            screen.edit { it.copy(ability = cycle(options.abilities, it.ability)) }
+        }
+        val genderButton = screen.button(gui("gender.${draft.gender.lowercase()}"), cellX + 2, rowY(2) + 1, cellW - 4, 9, gui("hint.cycle"), active = options.genders.size > 1) {
+            screen.edit { it.copy(gender = cycle(options.genders, it.gender)) }
+        }
+        genderSymbol(draft.gender)?.let { (symbol, color) ->
+            genderButton.icon = { ctx, x, y -> GuiKit.text(ctx, screen.font, Text.literal(symbol), x, y - 0.5f, color) }
+        }
+        screen.button(Text.literal("-"), cellX + 2, rowY(3) + 1, 9, 9, gui("hint.step"), active = draft.level > 1) {
+            screen.edit { it.copy(level = (it.level - step).coerceIn(1, screen.state.maxLevel)) }
+        }
+        screen.button(Text.literal("+"), cellX + 68, rowY(3) + 1, 9, 9, gui("hint.step"), active = draft.level < screen.state.maxLevel) {
+            screen.edit { it.copy(level = (it.level + step).coerceIn(1, screen.state.maxLevel)) }
+        }
+        val ball = draft.ball
+        screen.button(GuiKit.ballName(ball), cellX + 2, rowY(4) + 1, cellW - 4, 9, gui("hint.pick_ball")) {
+            pickingBall = true
+            ballList.reset()
+            screen.rebuild()
+        }.icon = { ctx, x, y -> GuiKit.itemIcon(ctx, ball, x, y, 8) }
+    }
+
+    protected open fun initShiny(x: Int, y: Int, w: Int) {
+        shinyButton(x, y, w, null) { screen.edit { it.copy(shiny = !it.shiny) } }
+    }
+
+    protected fun shinyButton(x: Int, y: Int, w: Int, tooltip: Text?, active: Boolean = true, onPress: () -> Unit) {
+        screen.button(yesNo(draft.shiny), x, y, w, 9, tooltip, active, onPress).icon = { ctx, ix, iy ->
+            ctx.drawTexture(GuiKit.SHINY_ICON, ix, iy, 8, 8, 0f, 0f, 16, 16, 16, 16)
+        }
+    }
+
+    override fun renderBackdrop(context: DrawContext) {
+        if (pickingBall) GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H) else super.renderBackdrop(context)
+    }
+
+    override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
+        if (pickingBall) {
+            renderBallPicker(context, mouseX, mouseY)
+            return
+        }
+        val font = screen.font
+        val locked = !creative
+        val labels = listOf("shiny", "ability", "gender", "level", "ball")
+        labels.forEachIndexed { row, key -> drawLabel(context, row, gui("field.$key"), if (locked && row > 0) GuiKit.DIM else GuiKit.WHITE) }
+        if (creative) {
+            GuiKit.textCentered(context, font, gui("level_value", draft.level, screen.state.maxLevel), cellX + 39.5f, rowY(3) + 1, maxWidth = 52, minScale = GuiKit.MEDIUM)
+            return
+        }
+        renderReadOnly(context)
+    }
+
+    /** Survival: ability, giới tính, level, bóng chỉ hiển thị (mờ) và ghi rõ "Creative only". */
+    private fun renderReadOnly(context: DrawContext) {
+        val font = screen.font
+        val x = cellX + 4
+        val w = cellW - 8
+        val gender = genderSymbol(draft.gender)
+        GuiKit.text(context, font, abilityLabel(draft.ability), x, rowY(1) + 1, GuiKit.DIM, maxWidth = w, minScale = GuiKit.MEDIUM)
+        GuiKit.text(context, font, gui("gender.${draft.gender.lowercase()}"), x + if (gender != null) 9 else 0, rowY(2) + 1, GuiKit.DIM, maxWidth = w - 9, minScale = GuiKit.MEDIUM)
+        if (gender != null) GuiKit.text(context, font, Text.literal(gender.first), x, rowY(2) + 1, gender.second)
+        GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 1, GuiKit.DIM, maxWidth = w)
+        GuiKit.itemIcon(context, draft.ball, x, rowY(4) + 1, 8)
+        GuiKit.text(context, font, GuiKit.ballName(draft.ball), x + 10, rowY(4) + 1, GuiKit.DIM, maxWidth = w - 10, minScale = GuiKit.MEDIUM)
+        GuiKit.textWrapped(context, font, gui("creative_only"), screen.panelX + 8, zoneY + 1, 118, 2, GuiKit.GRAY)
+    }
+
+    private fun renderBallPicker(context: DrawContext, mouseX: Int, mouseY: Int) {
+        val font = screen.font
+        val balls = screen.state.balls
+        GuiKit.text(context, font, gui("choose_ball"), screen.panelX + 8, screen.panelY + 9, GuiKit.WHITE, maxWidth = 118)
+        for (index in ballList.visible(balls.size)) {
+            val ball = balls[index]
+            val y = ballListY + (index - ballList.scroll) * ballList.rowHeight
+            val hovered = GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), ballListX, y, 117, ballList.rowHeight)
+            context.fill(ballListX, y, ballListX + 117, y + ballList.rowHeight - 1, if (hovered) GuiKit.FRAME else GuiKit.DARK)
+            GuiKit.itemIcon(context, ball, ballListX + 2, y + 1, 9)
+            GuiKit.text(context, font, GuiKit.ballName(ball), ballListX + 14, y + 1.5f, if (ball == draft.ball) GuiKit.GOLD else GuiKit.WHITE, maxWidth = 100, minScale = GuiKit.MEDIUM)
+        }
+        ballList.drawScrollbar(context, ballListX + 118, ballListY, balls.size)
+    }
+
+    override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (!pickingBall) return false
+        val balls = screen.state.balls
+        val index = ballList.hit(mouseX, mouseY, ballListX, ballListY, 117, balls.size)
+        if (index < 0) return false
+        pickingBall = false
+        screen.edit { it.copy(ball = balls[index]) }
         return true
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, amount: Double): Boolean {
-        list.scrollBy(amount, natures.size)
+        if (!pickingBall) return false
+        ballList.scrollBy(amount, screen.state.balls.size)
         return true
-    }
-}
-
-/** Shiny, ability, giới tính, level, loại bóng. */
-open class OtherTab(screen: EditorScreen) : EditorTab(screen) {
-    override val title: Text = gui("tab.other")
-
-    protected fun rowY(row: Int) = screen.contentY + 6 + row * 20
-
-    override fun init() {
-        val x = screen.contentX + 58
-        val options = screen.selectedSlot?.options ?: return
-        initShiny(x, rowY(0))
-        if (!creative) return
-
-        screen.button(abilityLabel(draft.ability), x, rowY(1), 70, 14, gui("hint.cycle")) {
-            screen.edit { it.copy(ability = cycle(options.abilities, it.ability)) }
-        }
-        screen.button(gui("gender.${draft.gender.lowercase()}"), x, rowY(2), 70, 14, gui("hint.cycle"), active = options.genders.size > 1) {
-            screen.edit { it.copy(gender = cycle(options.genders, it.gender)) }
-        }
-        screen.button(Text.literal("-"), x, rowY(3), 14, 14, gui("hint.step"), active = draft.level > 1) {
-            screen.edit { it.copy(level = (it.level - step).coerceIn(1, screen.state.maxLevel)) }
-        }
-        screen.button(Text.literal("+"), x + 56, rowY(3), 14, 14, gui("hint.step"), active = draft.level < screen.state.maxLevel) {
-            screen.edit { it.copy(level = (it.level + step).coerceIn(1, screen.state.maxLevel)) }
-        }
-        screen.button(GuiKit.ballName(draft.ball), x, rowY(4), 70, 14, gui("hint.cycle")) {
-            screen.edit { it.copy(ball = cycle(screen.state.balls, it.ball)) }
-        }
-    }
-
-    protected open fun initShiny(x: Int, y: Int) {
-        screen.button(yesNo(draft.shiny), x, y, 70, 14) { screen.edit { it.copy(shiny = !it.shiny) } }
-    }
-
-    override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
-        val x = screen.contentX
-        val labels = listOf("shiny", "ability", "gender", "level", "ball")
-        labels.forEachIndexed { row, key ->
-            GuiKit.text(context, screen.font, gui("field.$key"), x, rowY(row) + 4, scale = 0.75f)
-        }
-        if (creative) {
-            GuiKit.centeredText(context, screen.font, Text.literal(draft.level.toString()), screen.contentX + 93, rowY(3) + 4, scale = 0.75f)
-        } else {
-            renderReadOnly(context, x + 58)
-        }
-    }
-
-    /** Survival: ability, giới tính, level, bóng chỉ hiển thị. */
-    private fun renderReadOnly(context: DrawContext, x: Int) {
-        val font = screen.font
-        GuiKit.text(context, font, abilityLabel(draft.ability), x, rowY(1) + 4, GuiKit.GRAY, 0.75f)
-        GuiKit.text(context, font, gui("gender.${draft.gender.lowercase()}"), x, rowY(2) + 4, GuiKit.GRAY, 0.75f)
-        GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 4, GuiKit.GRAY, 0.75f)
-        GuiKit.text(context, font, GuiKit.ballName(draft.ball), x, rowY(4) + 4, GuiKit.GRAY, 0.75f)
-        GuiKit.text(context, font, gui("survival_locked"), screen.contentX, rowY(5) + 4, GuiKit.GRAY, 0.5f)
     }
 
     protected fun yesNo(value: Boolean): Text = gui(if (value) "yes" else "no")
 
-    private fun abilityLabel(name: String): Text {
+    private fun genderSymbol(gender: String): Pair<String, Int>? = when (gender.uppercase()) {
+        "MALE" -> Pair("♂", GuiKit.MALE)
+        "FEMALE" -> Pair("♀", GuiKit.FEMALE)
+        else -> null
+    }
+
+    protected fun abilityLabel(name: String): Text {
         val template = Abilities.get(name) ?: return Text.literal(name)
         return Text.translatable(template.displayName)
     }

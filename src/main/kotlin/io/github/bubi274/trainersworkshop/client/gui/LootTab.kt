@@ -52,11 +52,11 @@ class LootTab(screen: EditorScreen) : EditorTab(screen) {
         val x = screen.contentX
         val y = screen.contentY
         val modeKey = if (view.lootMode == LootMode.EVERY_WIN) "loot.mode.every_win" else "loot.mode.first_win"
-        screen.button(gui(modeKey), x, y, 128, 12, gui("hint.loot_mode")) {
+        screen.button(gui(modeKey), x, y, screen.contentWidth, 12, gui("hint.loot_mode")) {
             val next = if (view.lootMode == LootMode.EVERY_WIN) LootMode.FIRST_WIN_PER_PLAYER else LootMode.EVERY_WIN
             screen.trainerAction(TrainerEditing.LOOT_MODE) { putString("mode", next.name) }
         }
-        screen.button(gui(if (view.keepDefaultLoot) "loot.keep_default" else "loot.replace_default"), x, y + 14, 128, 12, gui("hint.loot_default")) {
+        screen.button(gui(if (view.keepDefaultLoot) "loot.keep_default" else "loot.replace_default"), x, y + 14, screen.contentWidth, 12, gui("hint.loot_default")) {
             screen.trainerAction(TrainerEditing.LOOT_KEEP_DEFAULT) { putBoolean("keep", !view.keepDefaultLoot) }
         }
 
@@ -82,7 +82,7 @@ class LootTab(screen: EditorScreen) : EditorTab(screen) {
                 screen.trainerAction(TrainerEditing.LOOT_REMOVE) { putInt("index", index) }
             }
         }
-        screen.button(gui("button.add_hand_item"), x, y + 124, 128, 12, gui("hint.add_hand_item"), active = view.loot.size < LootEntry.MAX_ENTRIES) {
+        screen.button(gui("button.add_hand_item"), x, y + 124, screen.contentWidth, 12, gui("hint.add_hand_item"), active = view.loot.size < LootEntry.MAX_ENTRIES) {
             screen.trainerAction(TrainerEditing.LOOT_ADD_HAND) {}
         }
     }
@@ -103,23 +103,23 @@ class LootTab(screen: EditorScreen) : EditorTab(screen) {
         val x = screen.contentX
         val font = screen.font
         val defaultTable = view.defaultLootTable.ifEmpty { "-" }
-        GuiKit.text(context, font, gui("loot.default_table", defaultTable), x, screen.contentY + 29, GuiKit.GRAY, 0.5f)
+        GuiKit.text(context, font, gui("loot.default_table", defaultTable), x, screen.contentY + 29, GuiKit.GRAY, maxWidth = screen.contentWidth, small = true)
         if (view.loot.isEmpty()) {
-            GuiKit.text(context, font, gui("loot.empty"), x, rowY(0) + 4, GuiKit.GRAY, 0.75f)
+            GuiKit.text(context, font, gui("loot.empty"), x, rowY(0) + 4, GuiKit.GRAY, maxWidth = screen.contentWidth)
             return
         }
         for (i in 0 until rows) {
             val entry = view.loot.getOrNull(first + i) ?: break
             val y = rowY(i)
             context.drawItem(entry.stack, x, y)
-            GuiKit.text(context, font, Text.literal("x${entry.stack.count}"), x + 17, y + 5, scale = 0.75f)
-            GuiKit.centeredText(context, font, Text.literal("${(entry.chance * 100).roundToInt()}%"), x + 67, y + 5, scale = 0.75f)
+            GuiKit.text(context, font, Text.literal("x${entry.stack.count}"), x + 17, y + 4, scale = GuiKit.MEDIUM, maxWidth = 12, minScale = 0.5f)
+            GuiKit.textCentered(context, font, Text.literal("${(entry.chance * 100).roundToInt()}%"), x + 67, y + 4, maxWidth = 26)
             if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, 16, 16)) {
                 context.drawTooltip(font, entry.stack.name, mouseX, mouseY)
             }
         }
         if (view.loot.size > rows) {
-            GuiKit.text(context, font, gui("loot.scroll", first + 1, minOf(first + rows, view.loot.size), view.loot.size), x, rowY(rows) + 1, GuiKit.GRAY, 0.5f)
+            GuiKit.text(context, font, gui("loot.scroll", first + 1, minOf(first + rows, view.loot.size), view.loot.size), x, rowY(rows) + 1, GuiKit.GRAY, maxWidth = screen.contentWidth, small = true)
         }
     }
 
