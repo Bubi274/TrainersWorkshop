@@ -3,6 +3,7 @@ package io.github.bubi274.trainersworkshop.client.gui
 import io.github.bubi274.trainersworkshop.editor.EDITOR_STATS
 import io.github.bubi274.trainersworkshop.editor.NO_HYPER
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
+import io.github.bubi274.trainersworkshop.editor.PokemonEditOptions
 import io.github.bubi274.trainersworkshop.editor.PokemonEditing
 import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
 import net.minecraft.item.Item
@@ -256,6 +257,45 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     override fun initShiny(x: Int, y: Int, w: Int) {
         shinyButton(x, y, w, gui("hint.shiny_berry"), active = !original.shiny) {
             screen.edit { it.copy(shiny = !it.shiny) }
+        }
+    }
+
+    override fun initAbility(x: Int, y: Int, w: Int, options: PokemonEditOptions) {
+        val choices = SurvivalCosts.survivalAbilities(original, options)
+        val tooltip = abilityTooltip(options, choices)
+        screen.button(abilityLabel(draft.ability), x, y, w, 9, tooltip, active = choices.size > 1) {
+            screen.edit { it.copy(ability = cycle(choices, it.ability)) }
+        }
+    }
+
+    private fun abilityTooltip(options: PokemonEditOptions, choices: List<String>): Text {
+        val capsule = SurvivalCosts.abilityCapsule()
+        val patch = SurvivalCosts.abilityPatch()
+        val capsuleName = capsule?.name ?: Text.literal("Ability Capsule")
+        val patchName = patch?.name ?: Text.literal("Ability Patch")
+        val haveCapsule = capsule?.let { screen.haveCount(it) } ?: 0
+        val havePatch = patch?.let { screen.haveCount(it) } ?: 0
+
+        if (choices.size <= 1) {
+            return if (!original.abilityForced && original.ability in options.hiddenAbilities && original.ability !in options.commonAbilities) {
+                gui("hint.ability_locked_hidden")
+            } else {
+                gui("hint.ability_locked_single")
+            }
+        }
+        if (draft.ability != original.ability) {
+            return if (draft.ability in options.commonAbilities) {
+                gui("hint.ability_requires", capsuleName, haveCapsule)
+            } else {
+                gui("hint.ability_requires", patchName, havePatch)
+            }
+        }
+        val canCapsule = options.commonAbilities.size > 1
+        val canPatch = options.hiddenAbilities.any { it != original.ability }
+        return when {
+            canCapsule && canPatch -> gui("hint.ability_both", capsuleName, haveCapsule, patchName, havePatch)
+            canCapsule -> gui("hint.ability_requires", capsuleName, haveCapsule)
+            else -> gui("hint.ability_requires", patchName, havePatch)
         }
     }
 

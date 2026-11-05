@@ -10,6 +10,7 @@ import io.github.bubi274.trainersworkshop.editor.EDITOR_STATS
 import io.github.bubi274.trainersworkshop.editor.EditorMode
 import io.github.bubi274.trainersworkshop.editor.MOVE_SLOTS
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
+import io.github.bubi274.trainersworkshop.editor.PokemonEditOptions
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
 import net.minecraft.client.gui.widget.TextFieldWidget
@@ -505,11 +506,9 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         }
         val options = screen.selectedSlot?.options ?: return
         initShiny(cellX + 2, rowY(0) + 1, cellW - 4)
+        initAbility(cellX + 2, rowY(1) + 1, cellW - 4, options)
         if (!creative) return
 
-        screen.button(abilityLabel(draft.ability), cellX + 2, rowY(1) + 1, cellW - 4, 9, gui("hint.cycle")) {
-            screen.edit { it.copy(ability = cycle(options.abilities, it.ability)) }
-        }
         val genderButton = screen.button(gui("gender.${draft.gender.lowercase()}"), cellX + 2, rowY(2) + 1, cellW - 4, 9, gui("hint.cycle"), active = options.genders.size > 1) {
             screen.edit { it.copy(gender = cycle(options.genders, it.gender)) }
         }
@@ -534,6 +533,12 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         shinyButton(x, y, w, null) { screen.edit { it.copy(shiny = !it.shiny) } }
     }
 
+    protected open fun initAbility(x: Int, y: Int, w: Int, options: PokemonEditOptions) {
+        screen.button(abilityLabel(draft.ability), x, y, w, 9, gui("hint.cycle")) {
+            screen.edit { it.copy(ability = cycle(options.abilities, it.ability)) }
+        }
+    }
+
     protected fun shinyButton(x: Int, y: Int, w: Int, tooltip: Text?, active: Boolean = true, onPress: () -> Unit) {
         screen.button(yesNo(draft.shiny), x, y, w, 9, tooltip, active, onPress).icon = { ctx, ix, iy ->
             ctx.drawTexture(GuiKit.SHINY_ICON, ix, iy, 8, 8, 0f, 0f, 16, 16, 16, 16)
@@ -552,7 +557,14 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         val font = screen.font
         val locked = !creative
         val labels = listOf("shiny", "ability", "gender", "level", "ball")
-        labels.forEachIndexed { row, key -> drawLabel(context, row, gui("field.$key"), if (locked && row > 0) GuiKit.DIM else GuiKit.WHITE) }
+        labels.forEachIndexed { row, key ->
+            val color = when {
+                screen.hasProblem(key) -> GuiKit.RED
+                locked && row > 1 -> GuiKit.DIM
+                else -> GuiKit.WHITE
+            }
+            drawLabel(context, row, gui("field.$key"), color)
+        }
         if (creative) {
             GuiKit.textCentered(context, font, gui("level_value", draft.level, screen.state.maxLevel), cellX + 39.5f, rowY(3) + 1, maxWidth = 52, minScale = GuiKit.MEDIUM)
             return
@@ -560,13 +572,12 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         renderReadOnly(context)
     }
 
-    /** Survival: ability, giới tính, level, bóng chỉ hiển thị (mờ) và ghi rõ "Creative only". */
+    /** Survival: giới tính, level, bóng chỉ hiển thị (mờ) và ghi rõ "Creative only". */
     private fun renderReadOnly(context: DrawContext) {
         val font = screen.font
         val x = cellX + 4
         val w = cellW - 8
         val gender = genderSymbol(draft.gender)
-        GuiKit.text(context, font, abilityLabel(draft.ability), x, rowY(1) + 1, GuiKit.DIM, maxWidth = w, minScale = GuiKit.MEDIUM)
         GuiKit.text(context, font, gui("gender.${draft.gender.lowercase()}"), x + if (gender != null) 9 else 0, rowY(2) + 1, GuiKit.DIM, maxWidth = w - 9, minScale = GuiKit.MEDIUM)
         if (gender != null) GuiKit.text(context, font, Text.literal(gender.first), x, rowY(2) + 1, gender.second)
         GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 1, GuiKit.DIM, maxWidth = w)
@@ -620,7 +631,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
     }
 
     /** Lấy phần tử kế tiếp (Shift: phần tử trước) trong danh sách. */
-    private fun cycle(values: List<String>, current: String): String {
+    protected fun cycle(values: List<String>, current: String): String {
         if (values.isEmpty()) return current
         val index = values.indexOf(current)
         val next = if (Screen.hasShiftDown()) index - 1 else index + 1

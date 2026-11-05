@@ -2,6 +2,7 @@ package io.github.bubi274.trainersworkshop.editor
 
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.api.abilities.Abilities
+import com.cobblemon.mod.common.api.abilities.CommonAbilityType
 import com.cobblemon.mod.common.api.moves.BenchedMove
 import com.cobblemon.mod.common.api.moves.Move
 import com.cobblemon.mod.common.api.moves.Moves
@@ -9,6 +10,7 @@ import com.cobblemon.mod.common.api.pokeball.PokeBalls
 import com.cobblemon.mod.common.api.pokemon.Natures
 import com.cobblemon.mod.common.pokemon.Gender
 import com.cobblemon.mod.common.pokemon.Pokemon
+import com.cobblemon.mod.common.pokemon.abilities.HiddenAbilityType
 import net.minecraft.util.Identifier
 
 /** Đọc và ghi dữ liệu Pokémon cho màn hình chỉnh sửa. Chỉ dùng ở phía server. */
@@ -31,6 +33,7 @@ object PokemonEditing {
         nature = pokemon.nature.name.toString(),
         mintedNature = pokemon.mintedNature?.name?.toString() ?: "",
         ability = pokemon.ability.name,
+        abilityForced = pokemon.ability.forced,
         ivs = EDITOR_STATS.map { pokemon.ivs.getOrDefault(it) },
         hyperIvs = EDITOR_STATS.map { pokemon.ivs.hyperTrainedIVs[it] ?: NO_HYPER },
         evs = EDITOR_STATS.map { pokemon.evs.getOrDefault(it) },
@@ -45,11 +48,15 @@ object PokemonEditing {
         val learnset = pokemon.form.moves
         val tm = learnset.levelUpMoves.values.flatten().map { it.name } + learnset.tmMoves.map { it.name }
         val abilities = pokemon.form.abilities.map { it.template.name } + pokemon.ability.name
+        val commonAbilities = pokemon.form.abilities.filter { it.type == CommonAbilityType }.map { it.template.name }.distinct()
+        val hiddenAbilities = pokemon.form.abilities.filter { it.type == HiddenAbilityType }.map { it.template.name }.distinct()
         return PokemonEditOptions(
             legalMoves = legal.distinct().sorted(),
             freeMoves = free.distinct().sorted(),
             tmMoves = tm.distinct().sorted(),
             abilities = abilities.distinct(),
+            commonAbilities = commonAbilities,
+            hiddenAbilities = hiddenAbilities,
             genders = allowedGenders(pokemon).map { it.name },
         )
     }
@@ -151,6 +158,13 @@ object PokemonEditing {
         if (target.effectiveNature != current.effectiveNature) {
             // Giống hệt khi dùng mint của Cobblemon: chỉ đặt mintedNature.
             Natures.getNature(Identifier.of(target.mintedNature))?.let { pokemon.mintedNature = it }
+        }
+        if (target.ability != current.ability) {
+            // Giống AbilityChangeItem / AbilityTypeChanger của Cobblemon: forced = false, priority = potential.priority.
+            val potential = pokemon.form.abilities.firstOrNull { it.template.name == target.ability }
+            if (potential != null) {
+                pokemon.updateAbility(potential.template.create(false, potential.priority))
+            }
         }
         applyMoves(pokemon, target.moves)
         if (target.shiny && !pokemon.shiny) pokemon.shiny = true

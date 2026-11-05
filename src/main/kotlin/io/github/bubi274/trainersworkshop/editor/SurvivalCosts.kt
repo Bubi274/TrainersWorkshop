@@ -97,6 +97,24 @@ object SurvivalCosts {
     const val GOLD_WITHERED_CAP_ID = "obc:bottle_cap_gold_withered"
     const val MIN_IV = 0
     fun tmId(move: String): String = "tmcraft:tm_$move"
+    const val ABILITY_CAPSULE_ID = "cobblemon:ability_capsule"
+    const val ABILITY_PATCH_ID = "cobblemon:ability_patch"
+    fun abilityCapsule(): Item? = itemById(ABILITY_CAPSULE_ID)
+    fun abilityPatch(): Item? = itemById(ABILITY_PATCH_ID)
+
+    /** Danh sách ability hợp lệ có thể chọn ở chế độ Survival (bắt đầu bằng ability hiện tại). */
+    fun survivalAbilities(current: PokemonEditData, options: PokemonEditOptions): List<String> {
+        if (current.abilityForced || current.ability !in options.commonAbilities) {
+            return listOf(current.ability)
+        }
+        val otherCommons = if (options.commonAbilities.size > 1) {
+            options.commonAbilities.filter { it != current.ability }
+        } else {
+            emptyList()
+        }
+        val hiddens = options.hiddenAbilities.filter { it != current.ability }
+        return (listOf(current.ability) + otherCommons + hiddens).distinct()
+    }
 
     /**
      * Tính mã băm (hash) số lượng các vật phẩm liên quan trong túi đồ để phát hiện thay đổi.
@@ -118,6 +136,8 @@ object SurvivalCosts {
         add(itemById(GOLD_CAP_ID))
         add(itemById(GOLD_WITHERED_CAP_ID))
         add(ModItems.SHINY_BERRY)
+        add(abilityCapsule())
+        add(abilityPatch())
         mints.values.forEach { add(it) }
         options?.tmMoves?.forEach { move -> add(itemById(tmId(move))) }
         return h
@@ -132,13 +152,14 @@ object SurvivalCosts {
 
         // Những phần survival không được đổi.
         if (target.uuid != current.uuid || target.species != current.species) error = "pokemon_changed"
-        if (target.level != current.level || target.gender != current.gender || target.ability != current.ability ||
+        if (target.level != current.level || target.gender != current.gender ||
             target.ball != current.ball || target.nature != current.nature
         ) error = "survival_locked"
 
         addIvCosts(current, target, lines)?.let { error = it }
         addEvCosts(current, target, lines, have)?.let { error = it }
         addNatureCost(current, target, lines)?.let { error = it }
+        addAbilityCost(current, target, options, lines)?.let { error = it }
         addMoveCosts(current, target, options, lines)?.let { error = it }
         if (target.shiny != current.shiny) {
             if (!target.shiny) error = "survival_unshiny" else lines += Line("shiny", ModItems.SHINY_BERRY, 1)
@@ -240,6 +261,22 @@ object SurvivalCosts {
         if (target.mintedNature.isEmpty()) return "survival_locked"
         lines += Line("nature", mints[target.mintedNature], 1)
         return null
+    }
+
+    private fun addAbilityCost(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, lines: MutableList<Line>): String? {
+        if (target.ability == current.ability) return null
+        if (current.abilityForced || current.ability !in options.commonAbilities) return "survival_ability"
+        return when {
+            target.ability in options.commonAbilities && options.commonAbilities.size > 1 -> {
+                lines += Line("ability", abilityCapsule(), 1, ABILITY_CAPSULE_ID)
+                null
+            }
+            target.ability in options.hiddenAbilities -> {
+                lines += Line("ability", abilityPatch(), 1, ABILITY_PATCH_ID)
+                null
+            }
+            else -> "survival_ability"
+        }
     }
 
     private fun addMoveCosts(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, lines: MutableList<Line>): String? {

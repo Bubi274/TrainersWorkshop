@@ -38,6 +38,8 @@ data class PokemonEditData(
     /** Nature do mint ("" nếu chưa dùng mint). */
     val mintedNature: String,
     val ability: String,
+    /** Ability đang có bị ép ngoài pool (forced = true trong Cobblemon). */
+    val abilityForced: Boolean = false,
     /** IV gốc. */
     val ivs: List<Int>,
     /**
@@ -70,6 +72,7 @@ data class PokemonEditData(
         putString("nature", nature)
         putString("mintedNature", mintedNature)
         putString("ability", ability)
+        putBoolean("abilityForced", abilityForced)
         putIntArray("ivs", ivs.toIntArray())
         putIntArray("hyperIvs", hyperIvs.toIntArray())
         putIntArray("evs", evs.toIntArray())
@@ -90,6 +93,7 @@ data class PokemonEditData(
             nature = nbt.getString("nature"),
             mintedNature = nbt.getString("mintedNature"),
             ability = nbt.getString("ability"),
+            abilityForced = nbt.getBoolean("abilityForced"),
             ivs = fixedSize(nbt.getIntArray("ivs").toList(), EDITOR_STATS.size, 0),
             hyperIvs = fixedSize(nbt.getIntArray("hyperIvs").toList(), EDITOR_STATS.size, NO_HYPER),
             evs = fixedSize(nbt.getIntArray("evs").toList(), EDITOR_STATS.size, 0),
@@ -110,6 +114,10 @@ data class PokemonEditOptions(
     /** Chiêu dạy được bằng TM của TMCraft (học theo level hoặc theo TM). */
     val tmMoves: List<String>,
     val abilities: List<String>,
+    /** Ability thường của loài (CommonAbilityType). */
+    val commonAbilities: List<String> = emptyList(),
+    /** Ability ẩn của loài (HiddenAbilityType). */
+    val hiddenAbilities: List<String> = emptyList(),
     val genders: List<String>,
 ) {
     fun toNbt(): NbtCompound = NbtCompound().apply {
@@ -117,6 +125,8 @@ data class PokemonEditOptions(
         put("freeMoves", stringList(freeMoves))
         put("tmMoves", stringList(tmMoves))
         put("abilities", stringList(abilities))
+        put("commonAbilities", stringList(commonAbilities))
+        put("hiddenAbilities", stringList(hiddenAbilities))
         put("genders", stringList(genders))
     }
 
@@ -126,6 +136,8 @@ data class PokemonEditOptions(
             freeMoves = readStringList(nbt, "freeMoves"),
             tmMoves = readStringList(nbt, "tmMoves"),
             abilities = readStringList(nbt, "abilities"),
+            commonAbilities = readStringList(nbt, "commonAbilities"),
+            hiddenAbilities = readStringList(nbt, "hiddenAbilities"),
             genders = readStringList(nbt, "genders"),
         )
     }
