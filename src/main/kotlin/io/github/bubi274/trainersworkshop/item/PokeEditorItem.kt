@@ -21,7 +21,7 @@ class PokeEditorItem(settings: Item.Settings, private val mode: EditorMode) : It
         val stack = user.getStackInHand(hand)
         if (world.isClient || user !is ServerPlayerEntity) return TypedActionResult.success(stack)
 
-        if (mode == EditorMode.CREATIVE && !user.hasPermissionLevel(EditorSessions.OP_LEVEL)) {
+        if (mode == EditorMode.CREATIVE && !user.isCreative) {
             user.sendMessage(Text.translatable("message.${TrainersWorkshop.MOD_ID}.no_permission").formatted(Formatting.RED), true)
             return TypedActionResult.fail(stack)
         }

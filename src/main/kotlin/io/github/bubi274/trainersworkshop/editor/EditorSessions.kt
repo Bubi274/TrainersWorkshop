@@ -9,6 +9,8 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 import java.util.UUID
 
 /** Một màn hình đang mở của một người chơi. Server chỉ chấp nhận hành động khớp với phiên này. */
@@ -24,9 +26,6 @@ data class EditorStatus(val key: String, val args: List<String> = emptyList(), v
 }
 
 object EditorSessions {
-    /** Quyền OP cần cho các công cụ creative (giống lệnh /gamemode). */
-    const val OP_LEVEL = 2
-
     private val sessions = HashMap<UUID, EditorSession>()
 
     fun register() {
@@ -41,6 +40,10 @@ object EditorSessions {
     }
 
     fun openPartyEditor(player: ServerPlayerEntity, mode: EditorMode) {
+        if (mode == EditorMode.CREATIVE && !player.isCreative) {
+            player.sendMessage(Text.translatable("message.${TrainersWorkshop.MOD_ID}.no_permission").formatted(Formatting.RED), true)
+            return
+        }
         sessions[player.uuid] = EditorSession(mode)
         sendPartyState(player, mode, null)
     }
@@ -77,7 +80,8 @@ object EditorSessions {
     }
 
     private fun tryApplyToParty(player: ServerPlayerEntity, session: EditorSession, nbt: NbtCompound): EditorStatus {
-        if (session.mode == EditorMode.CREATIVE && !player.hasPermissionLevel(OP_LEVEL)) {
+        if (session.mode == EditorMode.CREATIVE && !player.isCreative) {
+            player.sendMessage(Text.translatable("message.${TrainersWorkshop.MOD_ID}.no_permission").formatted(Formatting.RED), true)
             return EditorStatus("no_permission", error = true)
         }
         if (BattleRegistry.getBattleByParticipatingPlayer(player) != null) {

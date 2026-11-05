@@ -3,11 +3,14 @@ package io.github.bubi274.trainersworkshop.editor
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.Species
+import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import net.minecraft.entity.Entity
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.nbt.NbtList
 import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 import java.util.UUID
 
@@ -43,6 +46,10 @@ object TrainerEditing {
     private const val MAX_DISTANCE = 32.0
 
     fun open(player: ServerPlayerEntity, entity: Entity) {
+        if (!player.isCreative) {
+            player.sendMessage(Text.translatable("message.${TrainersWorkshop.MOD_ID}.no_permission").formatted(Formatting.RED), true)
+            return
+        }
         val session = loadSession(player, entity)
         EditorSessions.put(player, session)
         sendState(player, session, if (session.team.isEmpty()) EditorStatus("trainer_no_team", error = true) else null)
@@ -68,7 +75,8 @@ object TrainerEditing {
     }
 
     fun handle(player: ServerPlayerEntity, session: TrainerEditorSession, nbt: NbtCompound) {
-        if (!player.hasPermissionLevel(EditorSessions.OP_LEVEL)) {
+        if (!player.isCreative) {
+            player.sendMessage(Text.translatable("message.${TrainersWorkshop.MOD_ID}.no_permission").formatted(Formatting.RED), true)
             sendState(player, session, EditorStatus("no_permission", error = true))
             return
         }

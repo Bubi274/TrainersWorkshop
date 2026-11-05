@@ -18,13 +18,13 @@ import net.minecraft.util.Hand
 import net.minecraft.util.TypedActionResult
 import net.minecraft.world.World
 
-/** Trainer Editor: chuột phải vào trainer của Radical Cobblemon Trainers để chỉnh đội hình và đồ rơi. Chỉ OP. */
+/** Trainer Editor: chuột phải vào trainer của Radical Cobblemon Trainers để chỉnh đội hình và đồ rơi. Chỉ Creative. */
 class TrainerEditorItem(settings: Item.Settings) : Item(settings), EntityTargetItem {
 
     override fun canTarget(entity: Entity): Boolean = RctCompat.isTrainer(entity)
 
     override fun useOnEntity(player: ServerPlayerEntity, entity: Entity, stack: ItemStack): ActionResult {
-        if (!player.hasPermissionLevel(EditorSessions.OP_LEVEL)) {
+        if (!player.isCreative) {
             player.sendMessage(message("no_permission").formatted(Formatting.RED), true)
             return ActionResult.FAIL
         }
