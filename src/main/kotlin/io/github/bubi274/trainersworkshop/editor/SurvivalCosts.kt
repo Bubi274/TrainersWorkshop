@@ -99,6 +99,31 @@ object SurvivalCosts {
     fun tmId(move: String): String = "tmcraft:tm_$move"
 
     /**
+     * Tính mã băm (hash) số lượng các vật phẩm liên quan trong túi đồ để phát hiện thay đổi.
+     */
+    fun inventoryHash(options: PokemonEditOptions?, have: (Item) -> Int): Int {
+        var h = 1
+        fun add(item: Item?) {
+            h = 31 * h + (if (item != null) have(item) else -1)
+        }
+        EDITOR_STATS.forEach { stat ->
+            add(vitamin(stat))
+            add(feather(stat))
+            add(evBerry(stat))
+            add(candy(stat, true))
+            add(candy(stat, false))
+            add(itemById(bottleCapId(stat)))
+            add(itemById(witheredCapId(stat)))
+        }
+        add(itemById(GOLD_CAP_ID))
+        add(itemById(GOLD_WITHERED_CAP_ID))
+        add(ModItems.SHINY_BERRY)
+        mints.values.forEach { add(it) }
+        options?.tmMoves?.forEach { move -> add(itemById(tmId(move))) }
+        return h
+    }
+
+    /**
      * @param have số lượng vật phẩm người chơi đang có.
      */
     fun compute(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, have: (Item) -> Int): Result {

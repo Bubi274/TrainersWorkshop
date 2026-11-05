@@ -54,6 +54,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     /** Model nhỏ trong từng ô party (giữ lại giữa các lần rebuild để animation không bị giật). */
     private val slotModels = HashMap<Int, Pair<String, ModelWidget>>()
+    private var lastInventoryHash: Int = 0
 
     val mode: EditorMode get() = state.mode
     val selectedSlot: EditorSlot? get() = state.slot(selectedIndex)
@@ -169,13 +170,28 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return addWidget(button)
     }
 
+    private fun computeInventoryHash(): Int {
+        val player = client?.player ?: return 0
+        return SurvivalCosts.inventoryHash(selectedSlot?.options) { player.inventory.count(it) }
+    }
+
     override fun init() {
         rebuild()
+    }
+
+    override fun tick() {
+        super.tick()
+        val currentHash = computeInventoryHash()
+        if (currentHash != lastInventoryHash) {
+            lastInventoryHash = currentHash
+            rebuild()
+        }
     }
 
     fun rebuild() {
         // Chưa init (chưa biết kích thước màn hình): init() sẽ gọi lại.
         if (client == null) return
+        lastInventoryHash = computeInventoryHash()
         clearChildren()
         initTabs()
         if (draft != null || !activeTab.needsPokemon) activeTab.init()
