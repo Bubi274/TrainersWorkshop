@@ -264,6 +264,15 @@ class SurvivalMovesTab(screen: EditorScreen) : MovesTab(screen) {
         return Pair(gui("tag.tm_count", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
     }
 
+    override fun moveCostInfo(move: String): Pair<Text, Int> {
+        if (isFree(move)) return Pair(gui("tag.free"), GuiKit.GREEN)
+        val slot = screen.selectedSlot ?: return Pair(gui("tag.no_tm"), GuiKit.RED)
+        val tm = tmItem(move)
+        if (move !in slot.options.tmMoves || tm == null) return Pair(gui("tag.no_tm"), GuiKit.RED)
+        val have = screen.haveCount(tm)
+        return Pair(gui("move.needs_tm", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
+    }
+
     override fun pickerNote(): Text = gui("picker_note.survival")
 }
 
@@ -343,7 +352,7 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         super.render(context, mouseX, mouseY, delta)
         if (screen.hasProblem("shiny")) {
-            GuiKit.text(context, screen.font, gui("missing_shiny_berry"), screen.panelX + 8, zoneY + 15, GuiKit.RED, maxWidth = 118)
+            GuiKit.text(context, screen.font, gui("missing_shiny_berry"), screen.panelX + 8, screen.panelY + 97, GuiKit.RED, maxWidth = 118)
         }
     }
 }

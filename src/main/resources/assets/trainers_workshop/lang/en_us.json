@@ -80,6 +80,7 @@
   "gui.trainers_workshop.tag.free": "Free",
   "gui.trainers_workshop.tag.tm": "TM",
   "gui.trainers_workshop.tag.no_tm": "No TM",
+  "gui.trainers_workshop.move.needs_tm": "Needs TM (have %s)",
   "gui.trainers_workshop.tag.mint": "Mint",
   "gui.trainers_workshop.tag.no_mint": "No mint",
   "message.trainers_workshop.editor.missing_items": "You don't have all the items needed for these changes.",

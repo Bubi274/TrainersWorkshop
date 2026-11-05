@@ -228,6 +228,7 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
 
     protected var pickingSlot = -1
     protected var search = ""
+    protected var lastHoveredMove = ""
     private var focusSearch = false
     protected val list = RowList(rows = 7, rowHeight = 12)
 
@@ -256,17 +257,22 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
     /** Nhãn phụ bên phải mỗi hàng (survival: miễn phí / TM). */
     protected open fun rowTag(move: String): Pair<Text, Int>? = null
 
+    /** Dòng thứ 3 ở 3 ô thông tin góc trái dưới ("Free" hoặc "Needs TM (have N)"). */
+    protected open fun moveCostInfo(move: String): Pair<Text, Int> = Pair(gui("tag.free"), GuiKit.GREEN)
+
     /** Dòng chú thích dưới danh sách chọn chiêu (survival giải thích các nhãn). */
     protected open fun pickerNote(): Text? = null
 
     override fun reset() {
         pickingSlot = -1
         search = ""
+        lastHoveredMove = ""
     }
 
     private fun beginPicking(slot: Int) {
         pickingSlot = slot
         search = ""
+        lastHoveredMove = draft.moves.getOrNull(slot).orEmpty()
         focusSearch = true
         list.reset()
         screen.rebuild()
@@ -279,7 +285,7 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
 
     override fun init() {
         if (pickingSlot < 0) return
-        screen.button(gui("button.back"), screen.panelX + 7, screen.panelY + 118, 56, 20) { endPicking() }
+        screen.button(gui("button.back"), screen.panelX + 72, screen.panelY + 128, 54, 14) { endPicking() }
         val field = TextFieldWidget(screen.font, screen.panelX + 7, screen.panelY + 6, listWidth + 3, 12, gui("search"))
         field.setMaxLength(32)
         field.setPlaceholder(gui("search"))
@@ -337,33 +343,35 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
             GuiKit.textRight(context, font, gui("pp", template.pp), x + 105, y + 13, GuiKit.GRAY, maxWidth = 24, minScale = GuiKit.MEDIUM)
             if (tag != null) GuiKit.textRight(context, font, tag.first, x + 105, y + 4, tag.second, maxWidth = tagWidth, small = true)
         }
-        renderMoveDetails(context, hoveredMove)
+        if (hoveredMove != null) lastHoveredMove = hoveredMove
+        val detailMove = hoveredMove
+            ?: lastHoveredMove.takeIf { it in draft.moves && it.isNotEmpty() }
+            ?: draft.moves.firstOrNull { it.isNotEmpty() }
+        renderMoveDetails(context, detailMove)
         GuiKit.textWrapped(context, font, gui("hint.moves"), screen.panelX + 72, screen.panelY + 116, 54, 4, GuiKit.GRAY)
     }
 
-    /** Ba thanh nhỏ ở góc trái dưới panel: sức mạnh, độ chính xác, PP của chiêu đang rê chuột. */
+    /** Ba ô nhỏ ở góc trái dưới panel: Category, Accuracy, và "Free" / "Needs TM (have N)" của chiêu đang chọn/rê chuột. */
     private fun renderMoveDetails(context: DrawContext, move: String?) {
         val template = move?.let { Moves.getByName(it) } ?: return
-        val power = template.power.toInt()
         val accuracy = template.accuracy
-        val lines = listOf(
-            gui("power_full", if (power > 0) power.toString() else "-"),
-            gui("accuracy", if (accuracy > 0 && accuracy <= 100) accuracy.toInt().toString() else "-"),
-            gui("pp", template.pp),
-        )
-        lines.forEachIndexed { i, line ->
-            GuiKit.text(context, screen.font, line, screen.panelX + 9, screen.panelY + 114f + i * 11, scale = GuiKit.MEDIUM, maxWidth = 52, minScale = 0.6f)
-        }
+        val (costText, costColor) = moveCostInfo(move)
+        MoveCategoryIcon(x = screen.panelX + 9, y = screen.panelY + 114.5f, category = template.damageCategory).render(context)
+        GuiKit.text(context, screen.font, template.damageCategory.displayName, screen.panelX + 24, screen.panelY + 114f, scale = GuiKit.MEDIUM, maxWidth = 39, minScale = 0.55f)
+        GuiKit.text(context, screen.font, gui("accuracy", if (accuracy > 0 && accuracy <= 100) "${accuracy.toInt()}%" else "-"), screen.panelX + 9, screen.panelY + 125f, scale = GuiKit.MEDIUM, maxWidth = 54, minScale = 0.55f)
+        GuiKit.text(context, screen.font, costText, screen.panelX + 9, screen.panelY + 136f, costColor, scale = GuiKit.MEDIUM, maxWidth = 54, minScale = 0.55f)
     }
 
     private fun renderPicker(context: DrawContext, mouseX: Int, mouseY: Int) {
         val font = screen.font
         val moves = filtered()
         val all = candidates().size
+        var hoveredMove: String? = null
         for (index in list.visible(moves.size)) {
             val move = moves[index]
             val y = listY + (index - list.scroll) * list.rowHeight
             val hovered = GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), listX, y, listWidth, list.rowHeight)
+            if (hovered) hoveredMove = move
             context.fill(listX, y, listX + listWidth, y + list.rowHeight - 1, if (hovered) GuiKit.FRAME else GuiKit.DARK)
             val template = Moves.getByName(move)
             if (template != null) {
@@ -380,10 +388,15 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
             GuiKit.text(context, font, GuiKit.moveName(move), listX + 13, y + 1.5f, color, maxWidth = listWidth - 13 - 14 - tagWidth, minScale = GuiKit.MEDIUM)
             if (tag != null) GuiKit.textRight(context, font, tag.first, listX + listWidth - 15, y + 4, tag.second, maxWidth = tagWidth, small = true)
         }
+        if (hoveredMove != null) lastHoveredMove = hoveredMove
+        val detailMove = hoveredMove
+            ?: lastHoveredMove.takeIf { it.isNotEmpty() }
+            ?: draft.moves.getOrNull(pickingSlot)?.takeIf { it.isNotEmpty() }
+            ?: moves.firstOrNull()
+        renderMoveDetails(context, detailMove)
         if (moves.isEmpty()) GuiKit.textCentered(context, font, gui("no_results"), listX + listWidth / 2, listY + 8, GuiKit.GRAY, maxWidth = listWidth)
         list.drawScrollbar(context, listX + listWidth + 1, listY, moves.size)
         GuiKit.text(context, font, gui("moves_count", moves.size, all), screen.panelX + 72, screen.panelY + 116, GuiKit.GRAY, maxWidth = 54, small = true)
-        pickerNote()?.let { GuiKit.textWrapped(context, font, it, screen.panelX + 72, screen.panelY + 124, 54, 3, GuiKit.DIM) }
     }
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
@@ -546,7 +559,13 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
     }
 
     override fun renderBackdrop(context: DrawContext) {
-        if (pickingBall) GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H) else super.renderBackdrop(context)
+        if (pickingBall) {
+            GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
+        } else {
+            super.renderBackdrop(context)
+            // Xoá hàng thứ 6 (y=80..91) và các ô/thanh trống phía dưới (y=92..143) của summary_info_base.png vì tab Other chỉ dùng 5 hàng (0..4).
+            context.fill(screen.panelX + 4, screen.panelY + 77, screen.panelX + GuiKit.PANEL_W - 4, screen.panelY + GuiKit.PANEL_H - 4, GuiKit.LIGHT)
+        }
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
@@ -583,7 +602,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 1, GuiKit.DIM, maxWidth = w)
         GuiKit.itemIcon(context, draft.ball, x, rowY(4) + 1, 8)
         GuiKit.text(context, font, GuiKit.ballName(draft.ball), x + 10, rowY(4) + 1, GuiKit.DIM, maxWidth = w - 10, minScale = GuiKit.MEDIUM)
-        GuiKit.textWrapped(context, font, gui("creative_only"), screen.panelX + 8, zoneY + 1, 118, 2, GuiKit.GRAY)
+        GuiKit.textWrapped(context, font, gui("creative_only"), screen.panelX + 8, screen.panelY + 83, 118, 2, GuiKit.GRAY)
     }
 
     private fun renderBallPicker(context: DrawContext, mouseX: Int, mouseY: Int) {

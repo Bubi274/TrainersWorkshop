@@ -270,12 +270,27 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private fun renderable(data: PokemonEditData): RenderablePokemon? {
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species)) ?: return null
         val aspects = data.aspects.toMutableSet()
-        // TODO(api): giả định aspect shiny của Cobblemon tên là "shiny" (để xem trước model shiny).
         if (data.shiny) aspects.add("shiny") else aspects.remove("shiny")
-        return RenderablePokemon(species, aspects, ItemStack.EMPTY)
+        when (data.gender.uppercase()) {
+            "MALE" -> {
+                aspects.remove("female")
+                aspects.add("male")
+            }
+            "FEMALE" -> {
+                aspects.remove("male")
+                aspects.add("female")
+            }
+            else -> {
+                aspects.remove("male")
+                aspects.remove("female")
+            }
+        }
+        val heldItem = clientPokemon(data)?.let { if (it.heldItemVisible) it.heldItem() else ItemStack.EMPTY } ?: ItemStack.EMPTY
+        return RenderablePokemon(species, aspects, heldItem)
     }
 
-    private fun modelKey(data: PokemonEditData): String = "${data.uuid}|${data.species}|${(data.aspects + if (data.shiny) listOf("shiny") else listOf()).sorted()}"
+    private fun modelKey(data: PokemonEditData): String =
+        "${data.uuid}|${data.species}|${data.gender}|${(data.aspects + if (data.shiny) listOf("shiny") else listOf()).sorted()}"
 
     private fun updateModel() {
         val data = draft
@@ -286,19 +301,34 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             return
         }
         val key = modelKey(data)
-        if (key != modelKey || modelWidget == null) {
-            // Cùng thông số với Summary: ModelWidget(6, 32, 66, 66, pokemon, 2.0, 325.0, -10.0).
-            modelWidget = ModelWidget(
+        val current = modelWidget
+        val widget = if (key != modelKey || current == null) {
+            // Khớp Summary.init(): ModelWidget(left+6, top+32, 66, 66, pokemon, 2f, 325f, -10.0, playCryOnClick=false, shouldFollowCursor=true)
+            // và gọi setPokemon để đăng ký các hàm MoLang trên FloatingState như Summary.updatePokemonInfo().
+            ModelWidget(
                 pX = left + 6, pY = top + 32, pWidth = 66, pHeight = 66,
                 pokemon = pokemon,
                 baseScale = 2f, rotationY = 325f, offsetY = -10.0,
-            )
-            modelKey = key
+                playCryOnClick = false, shouldFollowCursor = true,
+            ).also {
+                it.pokemon = pokemon
+                modelWidget = it
+                modelKey = key
+            }
+        } else {
+            current.x = left + 6
+            current.y = top + 32
+            current
         }
-        modelWidget?.let { addDrawableChild(it) }
+        addDrawableChild(widget)
     }
 
-    // TODO(ui): baseScale / offsetY của model nhỏ trong ô party suy ra từ Summary (66 px -> 18 px), cần xem trong game.
+    /**
+     * Khớp PartySlotWidget của Summary:
+     * PartySlotWidget dịch tới (x + 12.5, y - 3.0), xoay Vector3f(13f, 35f, 0f) (quay sang trái) và scale 2.5 * 4.5 = 11.25 (= 0.5625 * 20).
+     * Với ModelWidget(pX = x + 3, pY = y + 3, pWidth = 19, pHeight = 22, offsetY = -6.0):
+     * tâm ngang = (x + 3) + 19 * 0.5 = x + 12.5; tung độ = (y + 3) - 6.0 = y - 3.0.
+     */
     private fun updateSlotModels() {
         for (position in 0 until 6) {
             val slot = state.slot(position)
@@ -311,13 +341,20 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             val (x, y) = partySlotPos(position)
             val key = modelKey(data)
             val cached = slotModels[position]
-            val widget = if (cached != null && cached.first == key) cached.second else {
+            val widget = if (cached != null && cached.first == key) {
+                cached.second.x = x + 3
+                cached.second.y = y + 3
+                cached.second
+            } else {
                 ModelWidget(
-                    pX = x + 1, pY = y + 8, pWidth = 18, pHeight = 18,
+                    pX = x + 3, pY = y + 3, pWidth = 19, pHeight = 22,
                     pokemon = pokemon,
-                    baseScale = 0.55f, rotationY = 325f, offsetY = -3.0,
+                    baseScale = 0.5625f, rotationY = 35f, offsetY = -6.0,
                     playCryOnClick = false, shouldFollowCursor = false,
-                ).also { slotModels[position] = Pair(key, it) }
+                ).also {
+                    it.pokemon = pokemon
+                    slotModels[position] = Pair(key, it)
+                }
             }
             addDrawableChild(widget)
         }
@@ -336,8 +373,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
-        // Texture ô party vẽ ở renderBackground (dưới model); ở đây vẽ các lớp chữ trên widget.
+        // Texture ô party vẽ ở renderBackground (dưới model); ở đây vẽ các lớp chữ và đẩy Z như Summary.render.
         super.render(context, mouseX, mouseY, delta)
+        val matrices = context.matrices
+        matrices.push()
+        matrices.translate(0.0, 0.0, 1000.0)
         renderLeftPanel(context)
         renderPartySlots(context, mouseX, mouseY, backgroundPass = false)
         renderModeLabel(context)
@@ -348,14 +388,15 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             GuiKit.textCentered(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.no_pokemon"), panelX + GuiKit.PANEL_W / 2, panelY + 70, GuiKit.GRAY)
         }
         renderPartyTooltip(context, mouseX, mouseY)
+        matrices.pop()
     }
 
     /** Khung trái giống Summary: tab "Lv.xx", dòng tên (bóng + tên + giới tính), dấu shiny, icon hệ. */
     private fun renderLeftPanel(context: DrawContext) {
         val data = draft ?: return
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species)) ?: return
-        val levelText = Text.translatable("gui.${TrainersWorkshop.MOD_ID}.level", data.level)
-        GuiKit.text(context, font, levelText, left + 6, top + 4.5f, maxWidth = 48, minScale = GuiKit.MEDIUM)
+        GuiKit.text(context, font, Text.literal("Lv."), left + 6, top + 4.5f, scale = 1f, bold = true, shadow = true)
+        GuiKit.text(context, font, Text.literal(data.level.toString()), left + 19, top + 4.5f, scale = 1f, bold = true, shadow = true)
         GuiKit.itemIcon(context, data.ball, left + 4, top + 15, 8)
         GuiKit.text(context, font, species.translatedName, left + 13, top + 14.5f, maxWidth = 54, minScale = GuiKit.MEDIUM)
         genderSymbol(data.gender)?.let { (symbol, color) ->
@@ -506,10 +547,10 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private fun renderCost(context: DrawContext, mouseX: Int, mouseY: Int) {
         val cost = survivalCost() ?: return
         val x = left + 8
-        val y = footerTop + 6
-        GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.title"), x, y, GuiKit.GOLD, scale = GuiKit.MEDIUM, maxWidth = 40, minScale = 0.6f)
-        val listX = left + 50
-        val colWidth = 87
+        val y = footerTop + 7
+        GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.title"), x, y, GuiKit.GOLD, maxWidth = 28, small = true, bold = true)
+        val listX = left + 36
+        val colWidth = 94
         if (cost.isEmpty) {
             GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.none"), listX, y, GuiKit.GRAY, maxWidth = 2 * colWidth, small = true)
             return
