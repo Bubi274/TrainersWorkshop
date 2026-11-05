@@ -9,6 +9,7 @@ import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
 import net.minecraft.item.Item
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
+import net.minecraft.client.gui.screen.Screen
 import net.minecraft.text.Text
 
 /*
@@ -71,13 +72,20 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
             val effective = draft.effectiveIv(row)
             val up = SurvivalCosts.candy(stat, up = true)
             val down = SurvivalCosts.candy(stat, up = false)
+            val withoutCandy = original.hyperIvs[row].takeIf { it >= 0 } ?: draft.ivs[row]
+            val haveUp = up?.let { screen.haveCount(it) } ?: 0
+            val haveDown = down?.let { screen.haveCount(it) } ?: 0
+            val maxEffective = minOf(SurvivalCosts.MAX_IV, withoutCandy + haveUp)
+            val minEffective = maxOf(SurvivalCosts.MIN_IV, withoutCandy - haveDown)
             itemButton(Text.literal("-"), x + 2, y, 9, down, "hint.candy_down",
                 effective > SurvivalCosts.MIN_IV && allowed(field) { withEffective(it, row, effective - 1) }) {
-                screen.edit { withEffective(it, row, effective - 1) }
+                val goal = if (Screen.hasShiftDown()) minEffective else effective - 1
+                if (goal < effective) screen.edit { withEffective(it, row, goal) }
             }
             itemButton(Text.literal("+"), x + 39, y, 9, up, "hint.candy_up",
                 effective < SurvivalCosts.MAX_IV && allowed(field) { withEffective(it, row, effective + 1) }) {
-                screen.edit { withEffective(it, row, effective + 1) }
+                val goal = if (Screen.hasShiftDown()) maxEffective else effective + 1
+                if (goal > effective) screen.edit { withEffective(it, row, goal) }
             }
             baseButton(row, x + 50, y, 17, SurvivalCosts.MAX_IV, "button.max", "hint.bottle_cap", SurvivalCosts.bottleCapId(stat), gold)
             baseButton(row, x + 68, y, 9, SurvivalCosts.MIN_IV, "button.zero", "hint.withered_cap", SurvivalCosts.witheredCapId(stat), gold)
@@ -146,20 +154,53 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
 
     // ---------- EV ----------
 
-    /** EV: "-" berry giảm EV (-10), "+1" feather, "+10" vitamin (thiếu vitamin thì bù bằng feather). */
+    /** EV: "-" berry giảm EV (-10), "+1" feather, "+10" vitamin (thiếu vitamin thì bù bằng feather), "Max" tăng tối đa có thể. */
     private fun initEvs(x: Int) {
         EDITOR_STATS.forEachIndexed { row, stat ->
             val y = rowY(row) + 1
             val field = "ev.$row"
             val ev = draft.evs[row]
             val minus = evDown(row)
-            itemButton(Text.literal("-"), x + 2, y, 9, SurvivalCosts.evBerry(stat), "hint.ev_down",
+            val vitamin = SurvivalCosts.vitamin(stat)
+            val feather = SurvivalCosts.feather(stat)
+            val maxGoal = maxEvGoal(row, vitamin, feather)
+            itemButton(Text.literal("-"), x + 1, y, 8, SurvivalCosts.evBerry(stat), "hint.ev_down",
                 ev > 0 && allowed(field) { setEv(it, row, minus) }) { screen.edit { setEv(it, row, minus) } }
-            itemButton(Text.literal("+1"), x + 46, y, 14, SurvivalCosts.feather(stat), "hint.ev_feather",
+            itemButton(Text.literal("+1"), x + 33, y, 13, feather, "hint.ev_feather",
                 canRaise(row, 1) && allowed(field) { setEv(it, row, ev + 1) }) { screen.edit { setEv(it, row, ev + 1) } }
-            itemButton(Text.literal("+10"), x + 61, y, 16, SurvivalCosts.vitamin(stat), "hint.ev_vitamin",
+            itemButton(Text.literal("+10"), x + 47, y, 15, vitamin, "hint.ev_vitamin",
                 canRaise(row, 10) && allowed(field) { setEv(it, row, ev + 10) }) { screen.edit { setEv(it, row, ev + 10) } }
+            val haveVit = vitamin?.let { screen.haveCount(it) } ?: 0
+            val haveFea = feather?.let { screen.haveCount(it) } ?: 0
+            val maxBtn = screen.button(
+                gui("button.max"),
+                x + 63,
+                y,
+                15,
+                9,
+                gui("hint.ev_max", haveVit, haveFea),
+                active = maxGoal > ev && allowed(field) { setEv(it, row, maxGoal) },
+            ) {
+                screen.edit { setEv(it, row, maxGoal) }
+            }
+            if (haveVit == 0 && haveFea == 0 && maxGoal <= original.evs[row]) maxBtn.labelColor = GuiKit.RED
         }
+    }
+
+    /** Mức EV tối đa đạt được cho hàng [row] theo số vitamin + feather hiện có, giới hạn 252 mỗi chỉ số và 510 tổng. */
+    private fun maxEvGoal(row: Int, vitamin: Item?, feather: Item?): Int {
+        val current = draft.evs[row]
+        val base = original.evs[row]
+        val otherSum = draft.evs.sum() - current
+        val capLimit = minOf(PokemonEditing.MAX_EV, PokemonEditing.MAX_EV_TOTAL - otherSum)
+        if (capLimit <= current) return current
+        val maxDiff = maxOf(0, capLimit - base)
+        val haveVit = vitamin?.let { screen.haveCount(it) } ?: 0
+        val haveFea = feather?.let { screen.haveCount(it) } ?: 0
+        val useVit = minOf(maxDiff / SurvivalCosts.EV_PER_VITAMIN, haveVit)
+        val rem = maxDiff - useVit * SurvivalCosts.EV_PER_VITAMIN
+        val bestDiff = useVit * SurvivalCosts.EV_PER_VITAMIN + minOf(rem, haveFea)
+        return minOf(capLimit, base + bestDiff)
     }
 
     /** Trên mức gốc: bỏ bớt phần định tăng. Từ mức gốc trở xuống: mỗi berry giảm 10. */
@@ -182,7 +223,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         EDITOR_STATS.indices.forEach { row ->
             if (showEvs) {
                 val color = if (screen.hasProblem("ev.$row")) GuiKit.RED else changed(draft.evs[row], original.evs[row])
-                drawValue(context, row, cellX + 12, 33, draft.evs[row].toString(), color, draft.evs[row], PokemonEditing.MAX_EV)
+                drawValue(context, row, cellX + 10, 22, draft.evs[row].toString(), color, draft.evs[row], PokemonEditing.MAX_EV)
             } else {
                 val problem = screen.hasProblem("iv.$row") || ((draft.useGoldCap || draft.useGoldWithered) && screen.hasProblem("iv.gold"))
                 val effective = draft.effectiveIv(row)
