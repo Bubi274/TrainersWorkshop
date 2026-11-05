@@ -125,8 +125,8 @@ abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
 
     protected fun initPageButtons() {
         val y = screen.panelY + 123
-        screen.button(gui("button.tab_ivs"), screen.panelX + 5, y, 61, 20) { showEvs = false; screen.rebuild() }.selected = !showEvs
-        screen.button(gui("button.tab_evs"), screen.panelX + 70, y, 59, 20) { showEvs = true; screen.rebuild() }.selected = showEvs
+        screen.button(gui("button.view_iv"), screen.panelX + 5, y, 61, 20) { showEvs = false; screen.rebuild() }.selected = !showEvs
+        screen.button(gui("button.view_ev"), screen.panelX + 70, y, 59, 20) { showEvs = true; screen.rebuild() }.selected = showEvs
     }
 
     /** Đỏ nếu nature làm tăng chỉ số này, xanh nếu làm giảm (như Summary). */

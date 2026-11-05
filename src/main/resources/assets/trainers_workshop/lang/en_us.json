@@ -78,7 +78,7 @@
   "gui.trainers_workshop.hint.shiny_berry": "Uses one Shiny Berry.",
   "gui.trainers_workshop.missing_shiny_berry": "You need a Shiny Berry.",
   "gui.trainers_workshop.tag.free": "Free",
-  "gui.trainers_workshop.tag.tm": "TM",
+  "gui.trainers_workshop.tag.tm": "TM x%s",
   "gui.trainers_workshop.tag.no_tm": "No TM",
   "gui.trainers_workshop.move.needs_tm": "Needs TM (have %s)",
   "gui.trainers_workshop.tag.mint": "Mint",
@@ -137,8 +137,8 @@
   "gui.trainers_workshop.loot.default_table": "Default loot table: %s",
   "gui.trainers_workshop.loot.empty": "No custom loot.",
   "gui.trainers_workshop.loot.scroll": "%s-%s of %s (scroll)",
-  "gui.trainers_workshop.button.view_iv": "IV",
-  "gui.trainers_workshop.button.view_ev": "EV",
+  "gui.trainers_workshop.button.view_iv": "IVs",
+  "gui.trainers_workshop.button.view_ev": "EVs",
   "gui.trainers_workshop.header.iv": "Stat   IV      Candy -/+      Cap / Withered",
   "gui.trainers_workshop.header.ev": "Stat   EV      Berry   Feather   Vitamin",
   "gui.trainers_workshop.base_iv": "base %s",
@@ -177,7 +177,5 @@
   "gui.trainers_workshop.nature.no_mint": "No mint available for %s",
   "gui.trainers_workshop.picker_note.survival": "Free: already known. TM xN: TMs you have.",
   "gui.trainers_workshop.iv_detail": "Effective IV %s (base IV %s)",
-  "gui.trainers_workshop.tag.tm_count": "TM x%s",
-  "gui.trainers_workshop.button.tab_ivs": "IVs",
-  "gui.trainers_workshop.button.tab_evs": "EVs"
+  "gui.trainers_workshop.held_item": "Held Item"
 }

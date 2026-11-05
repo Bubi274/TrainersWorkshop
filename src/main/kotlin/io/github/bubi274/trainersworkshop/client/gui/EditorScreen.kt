@@ -458,7 +458,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             }
         }
         GuiKit.text(
-            context, font, Text.translatable("cobblemon.ui.held_item"),
+            context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.held_item"),
             left + 24, top + 114.5f,
             scale = 0.5f, minScale = 0.5f, bold = false, shadow = true, small = true,
         )

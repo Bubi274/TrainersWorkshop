@@ -261,7 +261,7 @@ class SurvivalMovesTab(screen: EditorScreen) : MovesTab(screen) {
         val tm = tmItem(move)
         if (move !in slot.options.tmMoves || tm == null) return Pair(gui("tag.no_tm"), GuiKit.RED)
         val have = screen.haveCount(tm)
-        return Pair(gui("tag.tm_count", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
+        return Pair(gui("tag.tm", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
     }
 
     override fun moveCostInfo(move: String): Pair<Text, Int> {
