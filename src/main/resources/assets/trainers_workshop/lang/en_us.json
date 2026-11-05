@@ -48,6 +48,7 @@
   "gui.trainers_workshop.no": "No",
   "gui.trainers_workshop.survival_locked": "Ability, gender, level and ball can't be changed in Survival.",
   "message.trainers_workshop.editor.applied": "Changes applied to %s.",
+  "message.trainers_workshop.editor.apply_failed": "Failed to apply changes. Your Pokémon and items were restored.",
   "message.trainers_workshop.editor.no_permission": "You need operator permission to use this.",
   "message.trainers_workshop.editor.in_battle": "You can't edit Pokémon during a battle.",
   "message.trainers_workshop.editor.pokemon_changed": "This Pokémon is no longer in that party slot. Reopen the editor.",

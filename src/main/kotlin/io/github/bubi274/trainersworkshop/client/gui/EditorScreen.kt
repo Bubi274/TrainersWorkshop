@@ -114,7 +114,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val slot = selectedSlot ?: return null
         val data = draft ?: return null
         val player = client?.player ?: return null
-        return SurvivalCosts.compute(slot.data, data, slot.options, { player.inventory.count(it) }, player.abilities.creativeMode)
+        return SurvivalCosts.compute(slot.data, data, slot.options) { player.inventory.count(it) }
     }
 
     fun hasProblem(field: String): Boolean = survivalCost()?.problems?.contains(field) == true
@@ -492,7 +492,6 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val x = left + 8
         val y = footerTop + 6
         GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.title"), x, y, GuiKit.GOLD, scale = GuiKit.MEDIUM, maxWidth = 40, minScale = 0.6f)
-        val creative = client?.player?.abilities?.creativeMode == true
         val listX = left + 50
         val colWidth = 87
         if (cost.isEmpty) {
@@ -503,7 +502,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val lines = mutableListOf<Pair<String, Int>>()
         for ((item, count) in entries) {
             val have = haveCount(item)
-            val color = if (creative || have >= count) GuiKit.WHITE else GuiKit.RED
+            val color = if (have >= count) GuiKit.WHITE else GuiKit.RED
             lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", count, item.name, have).string, color)
         }
         // Vật phẩm của mod tuỳ chọn chưa cài (Only Bottle Caps, TMCraft).
@@ -511,7 +510,6 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.unavailable", id).string, GuiKit.RED)
         }
         cost.error?.let { lines += Pair(Text.translatable("message.${TrainersWorkshop.MOD_ID}.editor.$it").string, GuiKit.RED) }
-        if (creative) lines.add(0, Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.creative").string, GuiKit.GOLD))
 
         val capacity = 8
         val shown = if (lines.size > capacity) lines.take(capacity - 1) else lines

@@ -86,23 +86,50 @@ object EditorSessions {
         val index = nbt.getInt("index")
         val pokemon = Cobblemon.storage.getParty(player).get(index) ?: return EditorStatus("pokemon_changed", error = true)
         val target = PokemonEditData.fromNbt(nbt.getCompound("data"))
+        val registries = player.server.registryManager
 
         when (session.mode) {
             EditorMode.CREATIVE -> {
                 PokemonEditing.validateCreative(pokemon, target)?.let { return EditorStatus(it, error = true) }
-                PokemonEditing.applyCreative(pokemon, target)
+                val backup = pokemon.saveToNBT(registries, NbtCompound())
+                try {
+                    PokemonEditing.applyCreative(pokemon, target)
+                } catch (e: Throwable) {
+                    runCatching { pokemon.loadFromNBT(registries, backup) }
+                    TrainersWorkshop.LOGGER.error("Failed to apply creative changes to Pokemon ${pokemon.uuid}", e)
+                    return EditorStatus("apply_failed", error = true)
+                }
             }
             EditorMode.SURVIVAL -> {
                 val current = PokemonEditing.snapshot(pokemon)
+                if (target == current) return EditorStatus("nothing_to_apply")
                 val options = PokemonEditing.options(pokemon)
                 PokemonEditing.validateMoves(pokemon, target.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
-                val free = player.abilities.creativeMode
-                val cost = SurvivalCosts.compute(current, target, options, { player.inventory.count(it) }, free)
+                val cost = SurvivalCosts.compute(current, target, options) { player.inventory.count(it) }
                 cost.error?.let { return EditorStatus(it, error = true) }
                 if (cost.problems.isNotEmpty()) return EditorStatus("missing_items", error = true)
-                if (cost.isEmpty) return EditorStatus("nothing_to_apply")
-                if (!free) InventoryUtil.take(player, cost.needed)
-                PokemonEditing.applySurvival(pokemon, current, target)
+
+                val backup = pokemon.saveToNBT(registries, NbtCompound())
+                val toDeduct = LinkedHashMap(cost.needed)
+                var deducted = false
+                try {
+                    if (toDeduct.isNotEmpty()) {
+                        InventoryUtil.take(player, toDeduct)
+                        deducted = true
+                        player.playerScreenHandler.sendContentUpdates()
+                    }
+                    PokemonEditing.applySurvival(pokemon, current, target)
+                } catch (e: Throwable) {
+                    runCatching { pokemon.loadFromNBT(registries, backup) }
+                    if (deducted) {
+                        runCatching {
+                            InventoryUtil.refund(player, toDeduct)
+                            player.playerScreenHandler.sendContentUpdates()
+                        }
+                    }
+                    TrainersWorkshop.LOGGER.error("Failed to apply survival changes to Pokemon ${pokemon.uuid}", e)
+                    return EditorStatus("apply_failed", error = true)
+                }
             }
             else -> return EditorStatus("invalid_request", error = true)
         }

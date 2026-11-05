@@ -28,12 +28,11 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     private val original get() = screen.selectedSlot!!.data
     private val options get() = screen.selectedSlot!!.options
     private val player get() = MinecraftClient.getInstance().player
-    private val free get() = player?.abilities?.creativeMode == true
 
     /** Thử một thay đổi: hợp lệ và đủ vật phẩm cho phần [field] thì mới mở nút. */
     private fun allowed(field: String, change: (PokemonEditData) -> PokemonEditData): Boolean {
         val inventory = player?.inventory ?: return false
-        val result = SurvivalCosts.compute(original, change(draft), options, { inventory.count(it) }, free)
+        val result = SurvivalCosts.compute(original, change(draft), options) { inventory.count(it) }
         val goldProblem = field.startsWith("iv.") && "iv.gold" in result.problems
         return result.error == null && field !in result.problems && !goldProblem
     }
@@ -44,7 +43,6 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         return Text.literal(
             when {
                 item == null -> "$hint (item not installed)"
-                free -> hint
                 else -> "$hint Have: ${screen.haveCount(item)}."
             },
         )
@@ -53,7 +51,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     /** Nút dùng vật phẩm: chữ đỏ nếu không có vật phẩm (hoặc mod chứa nó chưa cài). */
     private fun itemButton(label: Text, x: Int, y: Int, w: Int, item: Item?, hintKey: String, active: Boolean, onPress: () -> Unit) {
         val button = screen.button(label, x, y, w, 9, tip(hintKey, item), active, onPress)
-        if (item == null || (!free && screen.haveCount(item) == 0)) button.labelColor = GuiKit.RED
+        if (item == null || screen.haveCount(item) == 0) button.labelColor = GuiKit.RED
     }
 
     override fun init() {

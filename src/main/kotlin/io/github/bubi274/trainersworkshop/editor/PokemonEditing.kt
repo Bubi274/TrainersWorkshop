@@ -2,6 +2,8 @@ package io.github.bubi274.trainersworkshop.editor
 
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.api.abilities.Abilities
+import com.cobblemon.mod.common.api.moves.BenchedMove
+import com.cobblemon.mod.common.api.moves.Move
 import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokeball.PokeBalls
 import com.cobblemon.mod.common.api.pokemon.Natures
@@ -167,19 +169,52 @@ object PokemonEditing {
         EDITOR_STATS.forEachIndexed { i, stat -> if (evs[i] > 0) pokemon.setEV(stat, evs[i]) }
     }
 
-    /** Đổi chiêu giống cách màn hình Summary của Cobblemon làm (chiêu cũ được cất vào danh sách đã học). */
+    /**
+     * Tính sẵn danh sách 4 chiêu cuối cùng rồi ghi một lần duy nhất trong cơ chế tắt phát sự kiện
+     * (doWithoutEmitting / doThenEmit) để chỉ gửi đúng 1 gói cập nhật moveset và 1 gói cập nhật benchedMoves.
+     */
     fun applyMoves(pokemon: Pokemon, moves: List<String>) {
-        for (slot in 0 until MOVE_SLOTS) {
-            val wanted = moves[slot]
-            if (wanted.isEmpty()) continue
-            val old = pokemon.moveSet.getMovesWithNulls().getOrNull(slot)
-            if (old?.template?.name == wanted) continue
-            val template = Moves.getByName(wanted) ?: continue
-            if (old == null) {
-                pokemon.moveSet.setMove(slot, template.create())
-                pokemon.benchedMoves.remove(template)
-            } else {
-                pokemon.exchangeMove(old.template, template)
+        if (currentMoves(pokemon) == moves) return
+        val oldMoves = pokemon.moveSet.getMovesWithNulls().filterNotNull()
+        val oldByTemplate = oldMoves.associateBy { it.template }
+        val benchedByTemplate = pokemon.benchedMoves.associateBy { it.moveTemplate }
+
+        val finalMoves = List(MOVE_SLOTS) { slot ->
+            val name = moves.getOrNull(slot).orEmpty()
+            val template = if (name.isEmpty()) null else Moves.getByName(name)
+            when {
+                template == null -> null
+                oldByTemplate.containsKey(template) -> {
+                    val old = oldByTemplate.getValue(template)
+                    Move(template, old.currentPp, old.raisedPpStages)
+                }
+                else -> {
+                    val stages = benchedByTemplate[template]?.ppRaisedStages ?: 0
+                    template.create().also { move ->
+                        if (stages > 0) {
+                            move.raisedPpStages = stages
+                            move.currentPp = move.maxPp
+                        }
+                    }
+                }
+            }
+        }
+
+        val newTemplates = finalMoves.mapNotNull { it?.template }.toSet()
+        val removedOldMoves = oldMoves.filter { it.template !in newTemplates }
+
+        pokemon.moveSet.doWithoutEmitting {
+            for (slot in 0 until MOVE_SLOTS) {
+                pokemon.moveSet.setMove(slot, finalMoves[slot])
+            }
+        }
+        pokemon.moveSet.update()
+
+        val benchedChanged = removedOldMoves.isNotEmpty() || pokemon.benchedMoves.any { it.moveTemplate in newTemplates }
+        if (benchedChanged) {
+            pokemon.benchedMoves.doThenEmit {
+                newTemplates.forEach { pokemon.benchedMoves.remove(it) }
+                removedOldMoves.forEach { pokemon.benchedMoves.add(BenchedMove(it.template, it.raisedPpStages)) }
             }
         }
     }

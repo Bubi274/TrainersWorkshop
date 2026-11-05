@@ -100,9 +100,8 @@ object SurvivalCosts {
 
     /**
      * @param have số lượng vật phẩm người chơi đang có.
-     * @param free true nếu người chơi ở chế độ creative (không tốn vật phẩm).
      */
-    fun compute(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, have: (Item) -> Int, free: Boolean = false): Result {
+    fun compute(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, have: (Item) -> Int): Result {
         val lines = mutableListOf<Line>()
         var error: String? = null
 
@@ -125,11 +124,9 @@ object SurvivalCosts {
 
         val problems = mutableSetOf<String>()
         lines.filter { it.item == null }.forEach { problems += it.field }
-        if (!free) {
-            // Thiếu vật phẩm: đánh dấu mọi phần dùng vật phẩm đó.
-            val short = needed.filter { (item, count) -> have(item) < count }.keys
-            lines.filter { it.item in short }.forEach { problems += it.field }
-        }
+        // Thiếu vật phẩm: đánh dấu mọi phần dùng vật phẩm đó (luôn kiểm tra, kể cả khi ở Creative).
+        val short = needed.filter { (item, count) -> have(item) < count }.keys
+        lines.filter { it.item in short }.forEach { problems += it.field }
         return Result(lines, needed, problems, error)
     }
 
