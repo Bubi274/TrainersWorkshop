@@ -39,13 +39,13 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         return result.error == null && field !in result.problems && !goldProblem
     }
 
-    /** Mô tả nút kèm số vật phẩm đang có. */
+    /** Mô tả nút kèm tên vật phẩm (dòng đầu) và số vật phẩm đang có (dòng xám phía dưới). */
     private fun tip(key: String, item: Item?): Text {
         val hint = gui(key).string
         return Text.literal(
             when {
-                item == null -> "$hint (item not installed)"
-                else -> "$hint Have: ${screen.haveCount(item)}."
+                item == null -> "$hint\nItem not installed"
+                else -> "${item.name.string}\n$hint\nHave: ${screen.haveCount(item)}"
             },
         )
     }
@@ -305,7 +305,10 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
 
     /** Chỉ được bật shiny (tốn 1 Shiny Berry), không tắt được. */
     override fun initShiny(x: Int, y: Int, w: Int) {
-        shinyButton(x, y, w, gui("hint.shiny_berry"), active = !original.shiny) {
+        val berry = SurvivalCosts.itemById("trainers_workshop:shiny_berry")
+        val have = berry?.let { screen.haveCount(it) } ?: 0
+        val tipText = Text.literal("${berry?.name?.string ?: "Shiny Berry"}\n${gui("hint.shiny_berry").string}\nHave: $have")
+        shinyButton(x, y, w, tipText, active = !original.shiny) {
             screen.edit { it.copy(shiny = !it.shiny) }
         }
     }

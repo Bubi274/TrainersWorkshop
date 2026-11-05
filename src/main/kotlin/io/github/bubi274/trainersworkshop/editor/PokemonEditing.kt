@@ -11,6 +11,7 @@ import com.cobblemon.mod.common.api.pokemon.Natures
 import com.cobblemon.mod.common.pokemon.Gender
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.abilities.HiddenAbilityType
+import net.minecraft.registry.Registries
 import net.minecraft.util.Identifier
 
 /** Đọc và ghi dữ liệu Pokémon cho màn hình chỉnh sửa. Chỉ dùng ở phía server. */
@@ -23,23 +24,32 @@ object PokemonEditing {
 
     fun allBalls(): List<String> = PokeBalls.all().map { it.name.toString() }
 
-    fun snapshot(pokemon: Pokemon) = PokemonEditData(
-        uuid = pokemon.uuid,
-        species = pokemon.species.resourceIdentifier.toString(),
-        aspects = pokemon.aspects.toList(),
-        level = pokemon.level,
-        shiny = pokemon.shiny,
-        gender = pokemon.gender.name,
-        nature = pokemon.nature.name.toString(),
-        mintedNature = pokemon.mintedNature?.name?.toString() ?: "",
-        ability = pokemon.ability.name,
-        abilityForced = pokemon.ability.forced,
-        ivs = EDITOR_STATS.map { pokemon.ivs.getOrDefault(it) },
-        hyperIvs = EDITOR_STATS.map { pokemon.ivs.hyperTrainedIVs[it] ?: NO_HYPER },
-        evs = EDITOR_STATS.map { pokemon.evs.getOrDefault(it) },
-        moves = currentMoves(pokemon),
-        ball = pokemon.caughtBall.name.toString(),
-    )
+    fun snapshot(pokemon: Pokemon): PokemonEditData {
+        val held = pokemon.heldItem()
+        val heldId = if (held.isEmpty) "" else Registries.ITEM.getId(held.item).toString()
+        val heldCount = if (held.isEmpty) 0 else held.count
+        return PokemonEditData(
+            uuid = pokemon.uuid,
+            species = pokemon.species.resourceIdentifier.toString(),
+            aspects = pokemon.aspects.toList(),
+            level = pokemon.level,
+            shiny = pokemon.shiny,
+            gender = pokemon.gender.name,
+            nature = pokemon.nature.name.toString(),
+            mintedNature = pokemon.mintedNature?.name?.toString() ?: "",
+            ability = pokemon.ability.name,
+            abilityForced = pokemon.ability.forced,
+            ivs = EDITOR_STATS.map { pokemon.ivs.getOrDefault(it) },
+            hyperIvs = EDITOR_STATS.map { pokemon.ivs.hyperTrainedIVs[it] ?: NO_HYPER },
+            evs = EDITOR_STATS.map { pokemon.evs.getOrDefault(it) },
+            moves = currentMoves(pokemon),
+            ball = pokemon.caughtBall.name.toString(),
+            currentHealth = pokemon.currentHealth,
+            maxHealth = pokemon.maxHealth.coerceAtLeast(1),
+            heldItemId = heldId,
+            heldItemCount = heldCount,
+        )
+    }
 
     fun options(pokemon: Pokemon): PokemonEditOptions {
         val current = currentMoves(pokemon).filter { it.isNotEmpty() }

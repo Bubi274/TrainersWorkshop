@@ -51,6 +51,12 @@ data class PokemonEditData(
     /** Luôn có [MOVE_SLOTS] phần tử, "" là ô trống. */
     val moves: List<String>,
     val ball: String,
+    /** HP hiện tại và tối đa (để vẽ thanh HP giống PartySlotWidget ở cả 3 chế độ). */
+    val currentHealth: Int = 1,
+    val maxHealth: Int = 1,
+    /** Vật phẩm đang cầm (chỉ hiển thị, không chỉnh sửa). */
+    val heldItemId: String = "",
+    val heldItemCount: Int = 0,
     /** Survival: dùng Gold Bottle Cap để đưa cả 6 IV gốc lên 31. */
     val useGoldCap: Boolean = false,
     /** Survival: dùng Gold Withered Bottle Cap để đưa cả 6 IV gốc về 0. */
@@ -78,6 +84,10 @@ data class PokemonEditData(
         putIntArray("evs", evs.toIntArray())
         put("moves", stringList(moves))
         putString("ball", ball)
+        putInt("currentHealth", currentHealth)
+        putInt("maxHealth", maxHealth)
+        putString("heldItemId", heldItemId)
+        putInt("heldItemCount", heldItemCount)
         putBoolean("useGoldCap", useGoldCap)
         putBoolean("useGoldWithered", useGoldWithered)
     }
@@ -99,6 +109,10 @@ data class PokemonEditData(
             evs = fixedSize(nbt.getIntArray("evs").toList(), EDITOR_STATS.size, 0),
             moves = fixedSize(readStringList(nbt, "moves"), MOVE_SLOTS, ""),
             ball = nbt.getString("ball"),
+            currentHealth = if (nbt.contains("currentHealth")) nbt.getInt("currentHealth") else 1,
+            maxHealth = if (nbt.contains("maxHealth")) nbt.getInt("maxHealth").coerceAtLeast(1) else 1,
+            heldItemId = nbt.getString("heldItemId"),
+            heldItemCount = nbt.getInt("heldItemCount"),
             useGoldCap = nbt.getBoolean("useGoldCap"),
             useGoldWithered = nbt.getBoolean("useGoldWithered"),
         )

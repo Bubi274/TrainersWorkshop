@@ -21,6 +21,8 @@ class CobbleButton(
     var labelColor: Int? = null
     /** Vẽ icon 8x8 ở bên trái nhãn (toạ độ góc trên trái của icon). */
     var icon: ((DrawContext, Int, Int) -> Unit)? = null
+    /** Tooltip của nút; được EditorScreen gom và vẽ ở cuối hàm render() để nằm đè lên mọi model/chữ. */
+    var tooltipText: Text? = null
 
     override fun renderWidget(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         val pressedLook = selected || (active && isHovered)

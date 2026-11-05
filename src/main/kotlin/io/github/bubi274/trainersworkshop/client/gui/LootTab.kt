@@ -115,7 +115,7 @@ class LootTab(screen: EditorScreen) : EditorTab(screen) {
             GuiKit.text(context, font, Text.literal("x${entry.stack.count}"), x + 17, y + 4, scale = GuiKit.MEDIUM, maxWidth = 12, minScale = 0.5f)
             GuiKit.textCentered(context, font, Text.literal("${(entry.chance * 100).roundToInt()}%"), x + 67, y + 4, maxWidth = 26)
             if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, 16, 16)) {
-                context.drawTooltip(font, entry.stack.name, mouseX, mouseY)
+                screen.deferTooltip(entry.stack.name)
             }
         }
         if (view.loot.size > rows) {

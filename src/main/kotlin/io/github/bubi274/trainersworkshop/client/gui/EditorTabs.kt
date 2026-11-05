@@ -53,7 +53,7 @@ abstract class EditorTab(protected val screen: EditorScreen) {
     }
 
     protected fun hoverTooltip(context: DrawContext, mouseX: Int, mouseY: Int, x: Int, y: Int, w: Int, h: Int, text: Text) {
-        if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, w, h)) context.drawTooltip(screen.font, text, mouseX, mouseY)
+        if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, w, h)) screen.deferTooltip(text)
     }
 }
 

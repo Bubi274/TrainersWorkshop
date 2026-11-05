@@ -1,11 +1,18 @@
 package io.github.bubi274.trainersworkshop.client.gui
 
+import com.cobblemon.mod.common.api.gui.blitk
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.cobblemon.mod.common.client.CobblemonClient
+import com.cobblemon.mod.common.client.CobblemonResources
 import com.cobblemon.mod.common.client.gui.TypeIcon
+import com.cobblemon.mod.common.client.gui.drawProfilePokemon
 import com.cobblemon.mod.common.client.gui.summary.widgets.ModelWidget
 import com.cobblemon.mod.common.client.gui.summary.widgets.screens.SummaryTab
+import com.cobblemon.mod.common.client.render.getDepletableRedGreen
+import com.cobblemon.mod.common.client.render.models.blockbench.FloatingState
+import com.cobblemon.mod.common.client.render.renderScaledGuiItemIcon
 import com.cobblemon.mod.common.pokemon.RenderablePokemon
+import com.cobblemon.mod.common.util.math.fromEulerXYZDegrees
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.client.ClientEditor
 import io.github.bubi274.trainersworkshop.editor.EditorActions
@@ -19,14 +26,18 @@ import io.github.bubi274.trainersworkshop.editor.readStringList
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.gui.tooltip.Tooltip
 import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.gui.widget.ClickableWidget
 import net.minecraft.client.gui.widget.TextFieldWidget
 import net.minecraft.item.ItemStack
+import net.minecraft.item.Items
 import net.minecraft.nbt.NbtCompound
+import net.minecraft.registry.Registries
+import net.minecraft.text.OrderedText
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
+import org.joml.Quaternionf
+import org.joml.Vector3f
 import kotlin.math.max
 
 /**
@@ -52,8 +63,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private var modelWidget: ModelWidget? = null
     private var modelKey: String = ""
 
-    /** Model nhỏ trong từng ô party (giữ lại giữa các lần rebuild để animation không bị giật). */
-    private val slotModels = HashMap<Int, Pair<String, ModelWidget>>()
+    /** FloatingState cho từng ô party (giữ lại giữa các lần rebuild để animation không bị giật, giống PartySlotWidget). */
+    private val slotStates = HashMap<Int, Pair<String, FloatingState>>()
+    private val buttons = mutableListOf<CobbleButton>()
+    private val tabWidgets = mutableListOf<Pair<SummaryTab, Text>>()
+    private var pendingTooltip: List<OrderedText>? = null
     private var lastInventoryHash: Int = 0
 
     val mode: EditorMode get() = state.mode
@@ -165,9 +179,19 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     fun button(label: Text, x: Int, y: Int, w: Int, h: Int, tooltip: Text? = null, active: Boolean = true, onPress: () -> Unit): CobbleButton {
         val button = CobbleButton(x, y, w, h, label, onPress)
-        if (tooltip != null) button.setTooltip(Tooltip.of(tooltip))
+        button.tooltipText = tooltip
         button.active = active
+        buttons += button
         return addWidget(button)
+    }
+
+    /** Đưa một tooltip vào hàng chờ để vẽ ở cuối hàm render() (mỗi lần render chỉ vẽ tối đa 1 tooltip). */
+    fun deferTooltip(text: Text) {
+        if (pendingTooltip == null) pendingTooltip = GuiKit.wrapTooltip(font, text)
+    }
+
+    fun deferTooltipLines(lines: List<Text>) {
+        if (pendingTooltip == null && lines.isNotEmpty()) pendingTooltip = GuiKit.wrapTooltipLines(font, lines)
     }
 
     private fun computeInventoryHash(): Int {
@@ -193,6 +217,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         if (client == null) return
         lastInventoryHash = computeInventoryHash()
         clearChildren()
+        buttons.clear()
+        tabWidgets.clear()
         initTabs()
         if (draft != null || !activeTab.needsPokemon) activeTab.init()
         if (mode == EditorMode.TRAINER) initTrainerPanel() else initRightPanel()
@@ -204,8 +230,9 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private fun initTabs() {
         val step = if (tabs.size <= 1) 0 else minOf(31, (132 - 39) / (tabs.size - 1))
         tabs.forEachIndexed { i, tab ->
-            val widget = SummaryTab(left + 78 + i * step, top - 1, tab.title.copy(), tab.icon, ButtonWidget.PressAction { switchTab(tab) })
+            val widget = SummaryTab(left + 78 + i * step, top - 1, null, tab.icon, ButtonWidget.PressAction { switchTab(tab) })
             widget.toggleTab(tab == activeTab)
+            tabWidgets += Pair(widget, tab.title.copy())
             addDrawableChild(widget)
         }
     }
@@ -285,8 +312,20 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
                 aspects.remove("female")
             }
         }
-        val heldItem = clientPokemon(data)?.let { if (it.heldItemVisible) it.heldItem() else ItemStack.EMPTY } ?: ItemStack.EMPTY
+        val heldItem = clientPokemon(data)?.let { if (it.heldItemVisible) it.heldItem() else ItemStack.EMPTY } ?: heldItemStack(data)
         return RenderablePokemon(species, aspects, heldItem)
+    }
+
+    private fun heldItemStack(data: PokemonEditData): ItemStack {
+        clientPokemon(data)?.let {
+            val stack = it.heldItem()
+            if (!stack.isEmpty) return stack
+        }
+        if (data.heldItemId.isEmpty() || data.heldItemCount <= 0) return ItemStack.EMPTY
+        val id = Identifier.tryParse(data.heldItemId) ?: return ItemStack.EMPTY
+        val item = Registries.ITEM.get(id)
+        if (item == Items.AIR) return ItemStack.EMPTY
+        return ItemStack(item, data.heldItemCount)
     }
 
     private fun modelKey(data: PokemonEditData): String =
@@ -323,40 +362,23 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         addDrawableChild(widget)
     }
 
-    /**
-     * Khớp PartySlotWidget của Summary:
-     * PartySlotWidget dịch tới (x + 12.5, y - 3.0), xoay Vector3f(13f, 35f, 0f) (quay sang trái) và scale 2.5 * 4.5 = 11.25 (= 0.5625 * 20).
-     * Với ModelWidget(pX = x + 3, pY = y + 3, pWidth = 19, pHeight = 22, offsetY = -6.0):
-     * tâm ngang = (x + 3) + 19 * 0.5 = x + 12.5; tung độ = (y + 3) - 6.0 = y - 3.0.
-     */
+    /** Cập nhật FloatingState cho từng ô party giống PartySlotWidget. */
     private fun updateSlotModels() {
         for (position in 0 until 6) {
-            val slot = state.slot(position)
-            val data = if (position == selectedIndex) draft else slot?.data
+            val data = slotData(position)
             val pokemon = data?.let { renderable(it) }
             if (data == null || pokemon == null) {
-                slotModels.remove(position)
+                slotStates.remove(position)
                 continue
             }
-            val (x, y) = partySlotPos(position)
             val key = modelKey(data)
-            val cached = slotModels[position]
-            val widget = if (cached != null && cached.first == key) {
-                cached.second.x = x + 3
-                cached.second.y = y + 3
-                cached.second
+            val cached = slotStates[position]
+            if (cached == null || cached.first != key) {
+                val state = FloatingState().also { it.currentAspects = pokemon.aspects }
+                slotStates[position] = Pair(key, state)
             } else {
-                ModelWidget(
-                    pX = x + 3, pY = y + 3, pWidth = 19, pHeight = 22,
-                    pokemon = pokemon,
-                    baseScale = 0.5625f, rotationY = 35f, offsetY = -6.0,
-                    playCryOnClick = false, shouldFollowCursor = false,
-                ).also {
-                    it.pokemon = pokemon
-                    slotModels[position] = Pair(key, it)
-                }
+                cached.second.currentAspects = pokemon.aspects
             }
-            addDrawableChild(widget)
         }
     }
 
@@ -368,18 +390,19 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         context.drawTexture(GuiKit.PORTRAIT_BACKGROUND, left + 6, top + 32, 0f, 0f, 66, 66, 66, 66)
         context.drawTexture(GuiKit.SUMMARY_BASE, left, top, 0f, 0f, GuiKit.BASE_WIDTH, GuiKit.BASE_HEIGHT, GuiKit.BASE_WIDTH, GuiKit.BASE_HEIGHT)
         if (draft != null || !activeTab.needsPokemon) activeTab.renderBackdrop(context) else GuiKit.panel(context, panelX, panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
-        renderPartySlots(context, mouseX, mouseY, backgroundPass = true)
+        renderPartySlots(context, mouseX, mouseY, delta, backgroundPass = true)
         renderFooterFrame(context)
     }
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
-        // Texture ô party vẽ ở renderBackground (dưới model); ở đây vẽ các lớp chữ và đẩy Z như Summary.render.
+        pendingTooltip = null
+        // Texture nền và model 3D vẽ ở renderBackground / super.render; ở đây vẽ các lớp chữ/icon và đẩy Z như Summary.render.
         super.render(context, mouseX, mouseY, delta)
         val matrices = context.matrices
         matrices.push()
         matrices.translate(0.0, 0.0, 1000.0)
-        renderLeftPanel(context)
-        renderPartySlots(context, mouseX, mouseY, backgroundPass = false)
+        renderLeftPanel(context, mouseX, mouseY)
+        renderPartySlots(context, mouseX, mouseY, delta, backgroundPass = false)
         renderModeLabel(context)
         renderFooter(context, mouseX, mouseY)
         if (draft != null || !activeTab.needsPokemon) {
@@ -387,12 +410,31 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         } else {
             GuiKit.textCentered(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.no_pokemon"), panelX + GuiKit.PANEL_W / 2, panelY + 70, GuiKit.GRAY)
         }
-        renderPartyTooltip(context, mouseX, mouseY)
+        for (btn in buttons) {
+            val tip = btn.tooltipText
+            if (btn.visible && tip != null && btn.isMouseOver(mouseX.toDouble(), mouseY.toDouble())) {
+                deferTooltip(tip)
+                break
+            }
+        }
+        for ((tabWidget, title) in tabWidgets) {
+            if (tabWidget.visible && tabWidget.isMouseOver(mouseX.toDouble(), mouseY.toDouble())) {
+                deferTooltip(title)
+                break
+            }
+        }
+        renderPartyTooltip(mouseX, mouseY)
+        pendingTooltip?.takeIf { it.isNotEmpty() }?.let { lines ->
+            matrices.push()
+            matrices.translate(0.0, 0.0, 500.0)
+            context.drawOrderedTooltip(font, lines, mouseX, mouseY)
+            matrices.pop()
+        }
         matrices.pop()
     }
 
-    /** Khung trái giống Summary: tab "Lv.xx", dòng tên (bóng + tên + giới tính), dấu shiny, icon hệ. */
-    private fun renderLeftPanel(context: DrawContext) {
+    /** Khung trái giống Summary: tab "Lv.xx", dòng tên (bóng + tên + giới tính), dấu shiny, ô Held Item, icon hệ. */
+    private fun renderLeftPanel(context: DrawContext, mouseX: Int, mouseY: Int) {
         val data = draft ?: return
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species)) ?: return
         GuiKit.text(context, font, Text.literal("Lv."), left + 6, top + 4.5f, scale = 1f, bold = true, shadow = true)
@@ -405,6 +447,21 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         if (data.shiny) {
             context.drawTexture(GuiKit.SHINY_ICON, left + 63, top + 34, 8, 8, 0f, 0f, 16, 16, 16, 16)
         }
+        val heldStack = heldItemStack(data)
+        if (!heldStack.isEmpty) {
+            context.drawItem(heldStack, left + 3, top + 104)
+            context.drawItemInSlot(font, heldStack, left + 3, top + 104)
+            if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), left + 3, top + 104, 16, 16)) {
+                val c = client
+                if (c != null) deferTooltipLines(getTooltipFromItem(c, heldStack))
+                else deferTooltip(heldStack.name)
+            }
+        }
+        GuiKit.text(
+            context, font, Text.translatable("cobblemon.ui.held_item"),
+            left + 24, top + 114.5f,
+            scale = 0.5f, minScale = 0.5f, bold = false, shadow = true, small = true,
+        )
         val form = species.getForm(data.aspects.toSet())
         val spacer = if (form.secondaryType != null) GuiKit.TYPE_SPACER_DOUBLE else GuiKit.TYPE_SPACER
         context.drawTexture(spacer, left + 6, top + 126, 66, 12, 0f, 0f, 132, 24, 132, 24)
@@ -427,7 +484,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     private fun slotData(position: Int): PokemonEditData? = if (position == selectedIndex) draft else state.slot(position)?.data
 
-    private fun renderPartySlots(context: DrawContext, mouseX: Int, mouseY: Int, backgroundPass: Boolean) {
+    private fun renderPartySlots(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float, backgroundPass: Boolean) {
         for (position in 0 until 6) {
             val (x, y) = partySlotPos(position)
             val data = slotData(position)
@@ -440,6 +497,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
                     if (position != selectedIndex && GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, GuiKit.PARTY_SLOT_W, GuiKit.PARTY_SLOT_H)) {
                         context.fill(x + 1, y + 1, x + GuiKit.PARTY_SLOT_W - 1, y + GuiKit.PARTY_SLOT_H - 1, GuiKit.SLOT_HOVER_OVERLAY)
                     }
+                    renderSlotModel(context, position, x, y, data, delta)
                 }
                 continue
             }
@@ -448,26 +506,113 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    /** Tên + giới tính (trên), icon bóng (góc model), level + thanh HP (dưới phải). */
+    /** Vẽ model Pokémon trong ô party đúng theo PartySlotWidget: dịch tới (x+12.5, y-3), scale 2.5, góc xoay (13, 35, 0), scale 4.5. */
+    private fun renderSlotModel(context: DrawContext, position: Int, x: Int, y: Int, data: PokemonEditData, delta: Float) {
+        val pokemon = renderable(data) ?: return
+        val key = modelKey(data)
+        val cached = slotStates[position]
+        val state = if (cached != null && cached.first == key) {
+            cached.second.also { it.currentAspects = pokemon.aspects }
+        } else {
+            FloatingState().also {
+                it.currentAspects = pokemon.aspects
+                slotStates[position] = Pair(key, it)
+            }
+        }
+        val matrices = context.matrices
+        matrices.push()
+        matrices.translate(x + 12.5, y - 3.0, 0.0)
+        matrices.scale(2.5f, 2.5f, 1f)
+        drawProfilePokemon(
+            renderablePokemon = pokemon,
+            matrixStack = matrices,
+            rotation = Quaternionf().fromEulerXYZDegrees(Vector3f(13f, 35f, 0f)),
+            state = state,
+            partialTicks = delta,
+            scale = 4.5f,
+        )
+        matrices.pop()
+    }
+
+    /**
+     * Vẽ các thành phần của ô party theo đúng thông số PartySlotWidget của Cobblemon 1.7.3:
+     * - Bóng bắt: "textures/gui/ball/<tên bóng>.png" tại (x-2, y-3), vùng 18x22 trong 18x44, scale 0.5 (vẽ SAU model).
+     * - Thanh HP: CobblemonResources.WHITE tại (x+4, y+25), cao 1, dài = 37 * hpRatio, màu getDepletableRedGreen.
+     * - Tên: font vanilla, scale 0.5, không bóng chữ, tại (x+4, y+20), căn trái, cắt "…" nếu dài.
+     * - Giới tính: "textures/gui/party/party_gender_male/female.png" 7x5, scale 0.5, tại (x+40, y+20).
+     * - Level: "cobblemon.ui.lv.number", scale 0.5, căn giữa tại (x+31, y+13), có bóng chữ.
+     * - Held item: tại (x+14, y+9.5), scale 0.5 (renderScaledGuiItemIcon).
+     */
     private fun renderSlotInfo(context: DrawContext, x: Int, y: Int, data: PokemonEditData) {
+        val matrices = context.matrices
+        // 1. Bóng bắt (vẽ SAU model để nằm đè lên góc ô)
+        matrices.push()
+        matrices.translate((x - 2).toDouble(), (y - 3).toDouble(), 0.0)
+        matrices.scale(0.5f, 0.5f, 1f)
+        context.drawTexture(GuiKit.ballGuiTexture(data.ball), 0, 0, 0f, 0f, 18, 22, 18, 44)
+        matrices.pop()
+
+        // 2. Thanh HP
+        val hpPokemon = clientPokemon(data)
+        val maxHp = (hpPokemon?.maxHealth ?: data.maxHealth).coerceAtLeast(1)
+        val curHp = (hpPokemon?.currentHealth ?: data.currentHealth).coerceIn(0, maxHp)
+        val hpRatio = curHp.toFloat() / maxHp.toFloat()
+        val barWidth = hpRatio * 37f
+        if (barWidth > 0f) {
+            val (red, green) = getDepletableRedGreen(hpRatio)
+            blitk(
+                matrixStack = matrices,
+                texture = CobblemonResources.WHITE,
+                x = x + 4,
+                y = y + 25,
+                height = 1,
+                width = barWidth,
+                uOffset = 37f - barWidth,
+                textureWidth = barWidth / hpRatio,
+                red = red * 0.8f,
+                green = green * 0.8f,
+                blue = 0.27f,
+            )
+        }
+
+        // 3. Tên & Giới tính
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species))
         val name = species?.translatedName ?: Text.literal(data.species)
-        GuiKit.text(context, font, name, x + 4, y + 3, maxWidth = 33, minScale = 0.4f, small = true)
-        genderSymbol(data.gender)?.let { (symbol, color) -> GuiKit.text(context, font, Text.literal(symbol), x + 38, y + 3, color, small = true) }
-        GuiKit.itemIcon(context, data.ball, x + 1, y + 18, 8)
-        if (data.shiny) context.drawTexture(GuiKit.SHINY_ICON, x + 12, y + 18, 8, 8, 0f, 0f, 16, 16, 16, 16)
-        GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.level", data.level), x + 21, y + 11, maxWidth = 24, minScale = 0.4f, small = true)
-        val hp = clientPokemon(data)
-        if (hp != null) {
-            val max = hp.maxHealth.coerceAtLeast(1)
-            val current = hp.currentHealth.coerceIn(0, max)
-            val ratio = current / max.toFloat()
-            val color = when {
-                ratio > 0.5f -> 0x55D955
-                ratio > 0.2f -> 0xE6C533
-                else -> 0xE64545
-            }
-            GuiKit.bar(context, x + 21, y + 21, 23, 3, current, max, color)
+        val genderTex = when (data.gender.uppercase()) {
+            "MALE" -> GuiKit.PARTY_GENDER_MALE
+            "FEMALE" -> GuiKit.PARTY_GENDER_FEMALE
+            else -> null
+        }
+        GuiKit.text(
+            context, font, name, x + 4, y + 20,
+            scale = 0.5f, minScale = 0.5f, maxWidth = if (genderTex != null) 35 else 38,
+            bold = false, shadow = false, small = true,
+        )
+        if (genderTex != null) {
+            matrices.push()
+            matrices.translate((x + 40).toDouble(), (y + 20).toDouble(), 0.0)
+            matrices.scale(0.5f, 0.5f, 1f)
+            context.drawTexture(genderTex, 0, 0, 0f, 0f, 7, 5, 7, 5)
+            matrices.pop()
+        }
+
+        // 4. Level
+        GuiKit.textCentered(
+            context, font, Text.translatable("cobblemon.ui.lv.number", data.level),
+            x + 31, y + 13,
+            scale = 0.5f, minScale = 0.5f, bold = false, shadow = true, small = true,
+        )
+
+        // 5. Held item trong ô
+        val heldStack = heldItemStack(data)
+        if (!heldStack.isEmpty) {
+            renderScaledGuiItemIcon(
+                itemStack = heldStack,
+                x = x + 14.0,
+                y = y + 9.5,
+                scale = 0.5,
+                matrixStack = matrices,
+            )
         }
     }
 
@@ -475,16 +620,21 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private fun clientPokemon(data: PokemonEditData) =
         if (mode == EditorMode.TRAINER) null else CobblemonClient.storage.party.findByUUID(data.uuid)
 
-    private fun renderPartyTooltip(context: DrawContext, mouseX: Int, mouseY: Int) {
+    private fun renderPartyTooltip(mouseX: Int, mouseY: Int) {
         for (position in 0 until 6) {
             val (x, y) = partySlotPos(position)
             if (!GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), x, y, GuiKit.PARTY_SLOT_W, GuiKit.PARTY_SLOT_H)) continue
             val data = slotData(position) ?: return
             val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species))
-            val lines = mutableListOf<Text>(species?.translatedName ?: Text.literal(data.species))
-            lines += Text.translatable("gui.${TrainersWorkshop.MOD_ID}.level", data.level)
-            clientPokemon(data)?.let { lines += Text.literal("HP ${it.currentHealth} / ${it.maxHealth}") }
-            context.drawTooltip(font, lines, mouseX, mouseY)
+            val hpPokemon = clientPokemon(data)
+            val maxHp = (hpPokemon?.maxHealth ?: data.maxHealth).coerceAtLeast(1)
+            val curHp = (hpPokemon?.currentHealth ?: data.currentHealth).coerceIn(0, maxHp)
+            val lines = mutableListOf<Text>(
+                species?.translatedName ?: Text.literal(data.species),
+                Text.translatable("cobblemon.ui.lv.number", data.level),
+                Text.literal("HP $curHp / $maxHp"),
+            )
+            deferTooltipLines(lines)
             return
         }
     }
@@ -580,7 +730,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             val i = shown.size
             GuiKit.text(context, font, Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.more", hidden), listX + (i / 4) * colWidth, y + (i % 4) * 7, GuiKit.GRAY, maxWidth = colWidth - 4, small = true)
             if (GuiKit.inside(mouseX.toDouble(), mouseY.toDouble(), left + 4, footerTop + 4, 224, GuiKit.FOOTER_HEIGHT - 8)) {
-                context.drawTooltip(font, lines.map { Text.literal(it.first) }, mouseX, mouseY)
+                deferTooltipLines(lines.map { Text.literal(it.first) })
             }
         }
     }

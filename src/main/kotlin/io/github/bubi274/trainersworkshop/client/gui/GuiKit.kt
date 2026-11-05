@@ -14,6 +14,7 @@ import net.minecraft.text.MutableText
 import net.minecraft.text.OrderedText
 import net.minecraft.text.Style
 import net.minecraft.text.Text
+import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 
 /**
@@ -84,6 +85,8 @@ object GuiKit {
     val MOVE_OVERLAY = cobblemon("summary/summary_move_overlay.png")
     val PARTY_SLOT = cobblemon("summary/summary_party_slot.png")
     val PARTY_SLOT_EMPTY = cobblemon("summary/summary_party_slot_empty.png")
+    val PARTY_GENDER_MALE = cobblemon("party/party_gender_male.png")
+    val PARTY_GENDER_FEMALE = cobblemon("party/party_gender_female.png")
     val BUTTON = cobblemon("summary/summary_evolve_button.png")
     val TYPE_SPACER = cobblemon("summary/type_spacer.png")
     val TYPE_SPACER_DOUBLE = cobblemon("summary/type_spacer_double.png")
@@ -316,6 +319,50 @@ object GuiKit {
     fun ballName(id: String): Text {
         val parsed = Identifier.tryParse(id) ?: return Text.literal(id)
         return Text.translatable("item.${parsed.namespace}.${parsed.path}")
+    }
+
+    /** Texture bóng ở góc ô party: "textures/gui/ball/<tên bóng>.png" (cỡ 18x44, vẽ nửa trên 18x22). */
+    fun ballGuiTexture(id: String): Identifier {
+        val parsed = Identifier.tryParse(id) ?: Identifier.of("cobblemon", "poke_ball")
+        return Identifier.of(parsed.namespace, "textures/gui/ball/${parsed.path}.png")
+    }
+
+    /**
+     * Định dạng tooltip chuẩn vanilla (font mặc định, scale 1, tự xuống dòng ở 170 px):
+     * dòng đầu màu trắng (tên vật phẩm hoặc hành động), các dòng sau màu xám (ví dụ "Have: 15").
+     */
+    fun wrapTooltip(font: TextRenderer, raw: Text, maxWidth: Int = 170): List<OrderedText> {
+        val s = raw.string.trim()
+        if (s.isEmpty()) return emptyList()
+        val paragraphs = if ('\n' in s) {
+            s.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        } else {
+            val dot = s.indexOf(". ")
+            if (dot >= 0) listOf(s.substring(0, dot + 1).trim(), s.substring(dot + 2).trim()).filter { it.isNotEmpty() }
+            else listOf(s)
+        }
+        val out = mutableListOf<OrderedText>()
+        paragraphs.forEachIndexed { idx, part ->
+            val style = Style.EMPTY
+                .withFont(Style.DEFAULT_FONT_ID)
+                .withBold(false)
+                .withColor(if (idx == 0) Formatting.WHITE else Formatting.GRAY)
+            out += font.wrapLines(Text.literal(part).setStyle(style), maxWidth)
+        }
+        return out
+    }
+
+    fun wrapTooltipLines(font: TextRenderer, lines: List<Text>, maxWidth: Int = 170): List<OrderedText> {
+        val out = mutableListOf<OrderedText>()
+        lines.forEachIndexed { idx, line ->
+            val baseColor = line.style.color
+            val style = Style.EMPTY
+                .withFont(Style.DEFAULT_FONT_ID)
+                .withBold(false)
+                .let { if (baseColor != null) it.withColor(baseColor) else it.withColor(if (idx == 0) Formatting.WHITE else Formatting.GRAY) }
+            out += font.wrapLines(Text.literal(line.string).setStyle(style), maxWidth)
+        }
+        return out
     }
 
     fun inside(mouseX: Double, mouseY: Double, x: Int, y: Int, width: Int, height: Int): Boolean =
