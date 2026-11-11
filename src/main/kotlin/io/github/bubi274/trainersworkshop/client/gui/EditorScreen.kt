@@ -15,6 +15,7 @@ import com.cobblemon.mod.common.pokemon.RenderablePokemon
 import com.cobblemon.mod.common.util.math.fromEulerXYZDegrees
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.client.ClientEditor
+import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import io.github.bubi274.trainersworkshop.editor.EditorActions
 import io.github.bubi274.trainersworkshop.editor.EditorMode
 import io.github.bubi274.trainersworkshop.editor.EditorSlot
@@ -69,6 +70,13 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private val tabWidgets = mutableListOf<Pair<SummaryTab, Text>>()
     private var pendingTooltip: List<OrderedText>? = null
     private var lastInventoryHash: Int = 0
+
+    /**
+     * Survival: level tối đa được lên = nhỏ hơn giữa level cap RCT của người chơi và level tối đa của Cobblemon.
+     * Cap RCT đọc ở client bằng PlayerState (chỉ để hiển thị và khoá nút; server luôn tính lại bằng TrainerManager).
+     */
+    var levelCap: Int = state.maxLevel
+        private set
 
     val mode: EditorMode get() = state.mode
     val selectedSlot: EditorSlot? get() = state.slot(selectedIndex)
@@ -129,7 +137,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val slot = selectedSlot ?: return null
         val data = draft ?: return null
         val player = client?.player ?: return null
-        return SurvivalCosts.compute(slot.data, data, slot.options) { player.inventory.count(it) }
+        return SurvivalCosts.compute(slot.data, data, slot.options, levelCap) { player.inventory.count(it) }
     }
 
     fun hasProblem(field: String): Boolean = survivalCost()?.problems?.contains(field) == true
@@ -139,6 +147,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     /** Server gửi trạng thái mới (sau Apply hoặc khi đội hình thay đổi). */
     fun update(newState: EditorState, newStatus: NbtCompound?) {
         state = newState
+        refreshLevelCap()
         status = newStatus
         trainer = decodeTrainer()
         if (state.slot(selectedIndex) == null) selectedIndex = state.slots.firstOrNull()?.index ?: -1
@@ -199,14 +208,26 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return SurvivalCosts.inventoryHash(selectedSlot?.options) { player.inventory.count(it) }
     }
 
+    /** Cập nhật [levelCap]; trả về true nếu giá trị thay đổi. */
+    private fun refreshLevelCap(): Boolean {
+        if (mode != EditorMode.SURVIVAL) return false
+        val player = client?.player
+        val cap = SurvivalCosts.levelLimit(state.maxLevel, player?.let { RctCompat.clientLevelCap(it) })
+        if (cap == levelCap) return false
+        levelCap = cap
+        return true
+    }
+
     override fun init() {
+        refreshLevelCap()
         rebuild()
     }
 
     override fun tick() {
         super.tick()
+        val capChanged = refreshLevelCap()
         val currentHash = computeInventoryHash()
-        if (currentHash != lastInventoryHash) {
+        if (capChanged || currentHash != lastInventoryHash) {
             lastInventoryHash = currentHash
             rebuild()
         }

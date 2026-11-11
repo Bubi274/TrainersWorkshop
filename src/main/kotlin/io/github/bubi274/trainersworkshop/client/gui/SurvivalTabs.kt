@@ -34,7 +34,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     /** Thử một thay đổi: hợp lệ và đủ vật phẩm cho phần [field] thì mới mở nút. */
     private fun allowed(field: String, change: (PokemonEditData) -> PokemonEditData): Boolean {
         val inventory = player?.inventory ?: return false
-        val result = SurvivalCosts.compute(original, change(draft), options) { inventory.count(it) }
+        val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap) { inventory.count(it) }
         val goldProblem = field.startsWith("iv.") && "iv.gold" in result.problems
         return result.error == null && field !in result.problems && !goldProblem
     }
@@ -302,6 +302,8 @@ class SurvivalNatureTab(screen: EditorScreen) : NatureTab(screen) {
 
 class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     private val original get() = screen.selectedSlot!!.data
+    private val options get() = screen.selectedSlot!!.options
+    private val player get() = MinecraftClient.getInstance().player
 
     /** Chỉ được bật shiny (tốn 1 Shiny Berry), không tắt được. */
     override fun initShiny(x: Int, y: Int, w: Int) {
@@ -311,6 +313,45 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
         shinyButton(x, y, w, tipText, active = !original.shiny) {
             screen.edit { it.copy(shiny = !it.shiny) }
         }
+    }
+
+    override val levelEditable: Boolean get() = true
+
+    /** Tên và số lượng các loại kẹo tăng level đang có, mỗi loại một dòng (cho tooltip). */
+    private fun candyHave(): String = SurvivalCosts.levelCandies().joinToString("\n") { "${it.name.string}: ${screen.haveCount(it)}" }
+
+    /**
+     * Hàng Level: "+1" (lên 1 level), "Max" (lên level cao nhất kẹo đang có cho phép, tối đa bằng level cap).
+     * Chỉ tăng, không giảm. Khoá nút nếu đã tới cap hoặc không đủ kẹo.
+     */
+    override fun initLevel(x: Int, y: Int) {
+        val inventory = player?.inventory ?: return
+        val have: (Item) -> Int = { inventory.count(it) }
+        val cap = screen.levelCap
+        val atCap = draft.level >= cap
+        val next = draft.level + 1
+        val canNext = !atCap && SurvivalCosts.planLevel(original, next, options, have) != null
+        val maxLevel = if (atCap) draft.level else SurvivalCosts.maxAffordableLevel(original, options, cap, have)
+        val canMax = !atCap && maxLevel > draft.level
+
+        val capTip = gui("hint.level_cap_reached", cap)
+        val noCandyTip = Text.literal("${gui("hint.level_no_candy").string}\n${candyHave()}")
+        val plusTip = when {
+            atCap -> capTip
+            !canNext -> noCandyTip
+            else -> Text.literal("${gui("hint.level_plus").string}\n${candyHave()}")
+        }
+        val maxTip = when {
+            atCap -> capTip
+            !canMax -> noCandyTip
+            else -> Text.literal("${gui("hint.level_max", maxLevel).string}\n${candyHave()}")
+        }
+        screen.button(Text.literal("+1"), x + 2, y, 14, 9, plusTip, canNext) {
+            screen.edit { it.copy(level = next) }
+        }.also { if (!canNext && !atCap) it.labelColor = GuiKit.RED }
+        screen.button(gui("button.max"), x + 61, y, 17, 9, maxTip, canMax) {
+            screen.edit { it.copy(level = maxLevel) }
+        }.also { if (!canMax && !atCap) it.labelColor = GuiKit.RED }
     }
 
     override fun initAbility(x: Int, y: Int, w: Int, options: PokemonEditOptions) {
@@ -354,8 +395,19 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         super.render(context, mouseX, mouseY, delta)
+        val font = screen.font
+        // "Lv. hiện tại → Lv. mục tiêu" ở giữa hai nút, và "Cap: Lv. X" bên dưới.
+        val changed = draft.level != original.level
+        val levelText = if (changed) gui("level_change", original.level, draft.level) else gui("level", draft.level)
+        val levelColor = when {
+            screen.hasProblem("level") -> GuiKit.RED
+            changed -> GuiKit.GOLD
+            else -> GuiKit.WHITE
+        }
+        GuiKit.textCentered(context, font, levelText, cellX + 38.5f, rowY(3) + 1, levelColor, maxWidth = 43, minScale = 0.45f)
+        GuiKit.text(context, font, gui("level_cap", screen.levelCap), screen.panelX + 8, screen.panelY + 80, GuiKit.GRAY, maxWidth = 118)
         if (screen.hasProblem("shiny")) {
-            GuiKit.text(context, screen.font, gui("missing_shiny_berry"), screen.panelX + 8, screen.panelY + 97, GuiKit.RED, maxWidth = 118)
+            GuiKit.text(context, font, gui("missing_shiny_berry"), screen.panelX + 8, screen.panelY + 114, GuiKit.RED, maxWidth = 118)
         }
     }
 }

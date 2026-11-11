@@ -3,6 +3,7 @@ package io.github.bubi274.trainersworkshop.editor
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.battles.BattleRegistry
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import io.github.bubi274.trainersworkshop.network.EditorActionPayload
 import io.github.bubi274.trainersworkshop.network.EditorStatePayload
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
@@ -111,11 +112,14 @@ object EditorSessions {
                     maxHealth = current.maxHealth,
                     heldItemId = current.heldItemId,
                     heldItemCount = current.heldItemCount,
+                    experience = current.experience,
                 )
                 if (normalizedTarget == current) return EditorStatus("nothing_to_apply")
                 val options = PokemonEditing.options(pokemon)
                 PokemonEditing.validateMoves(pokemon, normalizedTarget.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
-                val cost = SurvivalCosts.compute(current, normalizedTarget, options) { player.inventory.count(it) }
+                // Level cap ở server: nhỏ hơn giữa cap RCT (nếu có) và level tối đa của Cobblemon.
+                val levelCap = SurvivalCosts.levelLimit(PokemonEditing.maxLevel(), RctCompat.serverLevelCap(player))
+                val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap) { player.inventory.count(it) }
                 cost.error?.let { return EditorStatus(it, error = true) }
                 if (cost.problems.isNotEmpty()) return EditorStatus("missing_items", error = true)
 

@@ -8,9 +8,11 @@ import com.cobblemon.mod.common.api.moves.Move
 import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokeball.PokeBalls
 import com.cobblemon.mod.common.api.pokemon.Natures
+import com.cobblemon.mod.common.api.pokemon.experience.SidemodExperienceSource
 import com.cobblemon.mod.common.pokemon.Gender
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.abilities.HiddenAbilityType
+import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import net.minecraft.registry.Registries
 import net.minecraft.util.Identifier
 
@@ -33,6 +35,7 @@ object PokemonEditing {
             species = pokemon.species.resourceIdentifier.toString(),
             aspects = pokemon.aspects.toList(),
             level = pokemon.level,
+            experience = pokemon.experience,
             shiny = pokemon.shiny,
             gender = pokemon.gender.name,
             nature = pokemon.nature.name.toString(),
@@ -68,7 +71,14 @@ object PokemonEditing {
             commonAbilities = commonAbilities,
             hiddenAbilities = hiddenAbilities,
             genders = allowedGenders(pokemon).map { it.name },
+            levelExp = levelExp(pokemon),
         )
+    }
+
+    /** Tổng EXP cần để đạt mỗi level (0..maxLevel) theo nhóm kinh nghiệm của Pokémon; ô 0 để trống. */
+    private fun levelExp(pokemon: Pokemon): List<Int> {
+        val group = pokemon.experienceGroup
+        return List(maxLevel() + 1) { level -> if (level < 1) 0 else group.getExperience(level) }
     }
 
     fun slot(index: Int, pokemon: Pokemon) = EditorSlot(index, snapshot(pokemon), options(pokemon))
@@ -148,6 +158,8 @@ object PokemonEditing {
 
     /** Ghi thay đổi survival (đã kiểm tra chi phí bằng SurvivalCosts). Chỉ đổi IV, EV, nature (mint), chiêu, shiny. */
     fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData) {
+        // 0) Level trước (giống bản Creative), vì chiêu học theo level phụ thuộc vào nó.
+        applyLevelByExperience(pokemon, target.level)
         // 1) Bottle Cap / Withered Bottle Cap: Only Bottle Caps đổi IV gốc bằng Pokemon.setIV.
         setIvs(pokemon, target.ivs)
         // TODO(build): thử trong game rằng kết quả giống hệt khi ăn từng viên kẹo (xem tooltip "effective IV").
@@ -176,8 +188,22 @@ object PokemonEditing {
                 pokemon.updateAbility(potential.template.create(false, potential.priority))
             }
         }
-        applyMoves(pokemon, target.moves)
+        // Chỉ đổi chiêu khi người chơi có chọn: nếu không, chiêu Pokémon vừa học khi lên level được giữ nguyên.
+        if (target.moves != current.moves) applyMoves(pokemon, target.moves)
         if (target.shiny && !pokemon.shiny) pokemon.shiny = true
+    }
+
+    /**
+     * Tăng level bằng cách cộng đúng số EXP còn thiếu để tới [level] (API EXP của Cobblemon),
+     * để Pokémon học chiêu theo level như khi dùng kẹo. Không gọi evolve: Cobblemon tự gửi thông báo
+     * tiến hoá như bình thường và người chơi tự chọn. Phần EXP dư của viên kẹo cuối bị bỏ.
+     * Ném lỗi nếu level cuối cùng không đúng (để Apply hoàn trả kẹo và khôi phục Pokémon).
+     */
+    fun applyLevelByExperience(pokemon: Pokemon, level: Int) {
+        if (level <= pokemon.level) return
+        val missing = pokemon.getExperienceToLevel(level)
+        if (missing > 0) pokemon.addExperience(SidemodExperienceSource(TrainersWorkshop.MOD_ID), missing)
+        check(pokemon.level == level) { "Expected level $level but got ${pokemon.level}" }
     }
 
     fun setIvs(pokemon: Pokemon, ivs: List<Int>) {

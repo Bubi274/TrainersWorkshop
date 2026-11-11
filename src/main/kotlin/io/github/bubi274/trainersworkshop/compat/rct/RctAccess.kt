@@ -6,6 +6,7 @@ import com.gitlab.srcmc.rctapi.api.trainer.TrainerNPC
 import com.gitlab.srcmc.rctapi.api.trainer.TrainerRegistry
 import com.gitlab.srcmc.rctmod.ModCommon
 import com.gitlab.srcmc.rctmod.api.RCTMod
+import com.gitlab.srcmc.rctmod.api.data.sync.PlayerState
 import com.gitlab.srcmc.rctmod.world.entities.TrainerMob
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.editor.LootMode
@@ -48,6 +49,25 @@ object RctAccess {
         built.remove(entityUuid)
         runCatching { registry.unregisterById(registryId(entityUuid)) }
     }
+
+    private var levelCapWarned = false
+
+    /** Gọi API level cap của RCT; mọi lỗi (đổi phiên bản, thiếu class...) trả về null và chỉ ghi log một lần. */
+    private fun levelCapOrNull(read: () -> Int): Int? = try {
+        read()
+    } catch (e: Throwable) {
+        if (!levelCapWarned) {
+            levelCapWarned = true
+            RctCompat.warn("Could not read the player's level cap; using the Cobblemon max level.", e)
+        }
+        null
+    }
+
+    fun serverLevelCap(player: PlayerEntity): Int? =
+        levelCapOrNull { RCTMod.getInstance().trainerManager.getData(player).levelCap }
+
+    fun clientLevelCap(player: PlayerEntity): Int? =
+        levelCapOrNull { PlayerState.get(player).levelCap }
 
     /** Kiểm tra lúc khởi động: các hàm RCT mà mixin bám vào còn tồn tại không. */
     fun checkHooks() {

@@ -54,6 +54,7 @@ items are used.
 | Switch to a move the Pokémon has already learned | Free |
 | Teach a new move | The TM for that move (TMCraft). The TM is used up. |
 | Make shiny | One Shiny Berry |
+| Raise the level | Exp Candies (XS +100, S +800, M +3000, L +10000, XL +30000 EXP) and Rare Candies (Cobblemon). See below. |
 
 IVs work the same way as in Cobblemon. Candies change the **effective IV** (Cobblemon's hyper training),
 not the base IV. Bottle Caps change the **base IV**, exactly like Only Bottle Caps does. When a Pokémon
@@ -61,7 +62,16 @@ has an effective IV, that value is used in battle. The IV tab shows how many of 
 to its button. Buttons are locked when you don't have enough items or the IV would leave 0–31. When you
 press **Apply**, caps are used first, then candies.
 
-Ability, level, gender and Poké Ball can't be changed in Survival.
+**Level.** The level can only go up, never down. The highest level you can reach is the lower of your
+Radical Cobblemon Trainers level cap and Cobblemon's maximum level (without RCT, only Cobblemon's maximum
+applies). At the cap, the buttons are locked. **+1** raises one level and **Max** raises as far as your
+candies allow. The editor works out how much EXP is missing, uses Exp Candies from biggest to smallest
+without going over, then finishes with one Rare Candy (if exactly one level is missing) or the smallest
+Exp Candy that covers the rest. The EXP left over from the last candy is lost. The EXP is added through
+Cobblemon's normal EXP system, so the Pokémon learns level-up moves as usual. It never evolves by itself:
+Cobblemon shows its usual evolution prompt and you choose.
+
+Gender and Poké Ball can't be changed in Survival.
 
 **Recipe** (shaped):
 
@@ -99,7 +109,7 @@ default team. Edited teams lose RCT's Mega/Tera/Dynamax settings. Details are in
 | Cobblemon | 1.7.3+1.21.1 (Fabric) | yes |
 | Fabric Language Kotlin | 1.13.6 or newer (bundled with Cobblemon) | yes |
 | Cobblemon Raid Dens | any | no: Shiny Berry raid drop |
-| Radical Cobblemon Trainers (rctmod + rctapi) | 0.18.1-beta / 0.15.2-beta | no: Trainer Editor |
+| Radical Cobblemon Trainers (rctmod + rctapi) | 0.18.1-beta / 0.15.2-beta | no: Trainer Editor, level cap in the Survival PokeEditor |
 | TMCraft | 1.4.18+1.7.3 | no: teaching new moves in the Survival PokeEditor |
 | Only Bottle Caps | 1.3.0 | no: raising IVs in the Survival PokeEditor |
 

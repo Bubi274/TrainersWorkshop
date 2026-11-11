@@ -520,7 +520,10 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         val options = screen.selectedSlot?.options ?: return
         initShiny(cellX + 2, rowY(0) + 1, cellW - 4)
         initAbility(cellX + 2, rowY(1) + 1, cellW - 4, options)
-        if (!creative) return
+        if (!creative) {
+            if (levelEditable) initLevel(cellX, rowY(3) + 1)
+            return
+        }
 
         val genderButton = screen.button(gui("gender.${draft.gender.lowercase()}"), cellX + 2, rowY(2) + 1, cellW - 4, 9, gui("hint.cycle"), active = options.genders.size > 1) {
             screen.edit { it.copy(gender = cycle(options.genders, it.gender)) }
@@ -541,6 +544,12 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
             screen.rebuild()
         }.icon = { ctx, x, y -> GuiKit.itemIcon(ctx, ball, x, y, 8) }
     }
+
+    /** Survival cho tăng level bằng kẹo (hàng Level không bị làm mờ). Bản Creative tự chỉnh level nên không dùng. */
+    protected open val levelEditable: Boolean get() = false
+
+    /** Các nút của hàng Level ở Survival; [x] là góc trái của ô giá trị, [y] là mép trên nút. */
+    protected open fun initLevel(x: Int, y: Int) {}
 
     protected open fun initShiny(x: Int, y: Int, w: Int) {
         shinyButton(x, y, w, null) { screen.edit { it.copy(shiny = !it.shiny) } }
@@ -579,7 +588,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         labels.forEachIndexed { row, key ->
             val color = when {
                 screen.hasProblem(key) -> GuiKit.RED
-                locked && row > 1 -> GuiKit.DIM
+                locked && row > 1 && !(row == 3 && levelEditable) -> GuiKit.DIM
                 else -> GuiKit.WHITE
             }
             drawLabel(context, row, gui("field.$key"), color)
@@ -591,7 +600,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         renderReadOnly(context)
     }
 
-    /** Survival: giới tính, level, bóng chỉ hiển thị (mờ) và ghi rõ "Creative only". */
+    /** Survival: giới tính và bóng chỉ hiển thị (mờ) và ghi rõ "Creative only"; level do SurvivalOtherTab vẽ. */
     private fun renderReadOnly(context: DrawContext) {
         val font = screen.font
         val x = cellX + 4
@@ -599,10 +608,10 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         val gender = genderSymbol(draft.gender)
         GuiKit.text(context, font, gui("gender.${draft.gender.lowercase()}"), x + if (gender != null) 9 else 0, rowY(2) + 1, GuiKit.DIM, maxWidth = w - 9, minScale = GuiKit.MEDIUM)
         if (gender != null) GuiKit.text(context, font, Text.literal(gender.first), x, rowY(2) + 1, gender.second)
-        GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 1, GuiKit.DIM, maxWidth = w)
+        if (!levelEditable) GuiKit.text(context, font, Text.literal(draft.level.toString()), x, rowY(3) + 1, GuiKit.DIM, maxWidth = w)
         GuiKit.itemIcon(context, draft.ball, x, rowY(4) + 1, 8)
         GuiKit.text(context, font, GuiKit.ballName(draft.ball), x + 10, rowY(4) + 1, GuiKit.DIM, maxWidth = w - 10, minScale = GuiKit.MEDIUM)
-        GuiKit.textWrapped(context, font, gui("creative_only"), screen.panelX + 8, screen.panelY + 83, 118, 2, GuiKit.GRAY)
+        GuiKit.textWrapped(context, font, gui("creative_only"), screen.panelX + 8, screen.panelY + if (levelEditable) 91 else 83, 118, 2, GuiKit.GRAY)
     }
 
     private fun renderBallPicker(context: DrawContext, mouseX: Int, mouseY: Int) {
