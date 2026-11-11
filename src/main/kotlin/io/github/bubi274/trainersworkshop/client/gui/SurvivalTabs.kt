@@ -317,39 +317,26 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
 
     override val levelEditable: Boolean get() = true
 
-    /** Tên và số lượng các loại kẹo tăng level đang có, mỗi loại một dòng (cho tooltip). */
-    private fun candyHave(): String = SurvivalCosts.levelCandies().joinToString("\n") { "${it.name.string}: ${screen.haveCount(it)}" }
-
     /**
-     * Hàng Level: "+1" (lên 1 level), "Max" (lên level cao nhất kẹo đang có cho phép, tối đa bằng level cap).
-     * Chỉ tăng, không giảm. Khoá nút nếu đã tới cap hoặc không đủ kẹo.
+     * Hàng Level: "+1" (lên 1 level) và "Max" (lên tối đa min(cap, level hiện tại + số Rare Candy)).
+     * Mỗi level tốn 1 Rare Candy. Chỉ tăng, không giảm. Khoá nút nếu đã tới cap hoặc không đủ kẹo.
      */
     override fun initLevel(x: Int, y: Int) {
         val inventory = player?.inventory ?: return
-        val have: (Item) -> Int = { inventory.count(it) }
+        val rare = SurvivalCosts.rareCandy()
+        val haveRare = rare?.let { inventory.count(it) } ?: 0
         val cap = screen.levelCap
         val atCap = draft.level >= cap
         val next = draft.level + 1
-        val canNext = !atCap && SurvivalCosts.planLevel(original, next, options, have) != null
-        val maxLevel = if (atCap) draft.level else SurvivalCosts.maxAffordableLevel(original, options, cap, have)
+        val canNext = !atCap && next - original.level <= haveRare
+        val maxLevel = SurvivalCosts.maxAffordableLevel(original, cap) { inventory.count(it) }
         val canMax = !atCap && maxLevel > draft.level
 
-        val capTip = gui("hint.level_cap_reached", cap)
-        val noCandyTip = Text.literal("${gui("hint.level_no_candy").string}\n${candyHave()}")
-        val plusTip = when {
-            atCap -> capTip
-            !canNext -> noCandyTip
-            else -> Text.literal("${gui("hint.level_plus").string}\n${candyHave()}")
-        }
-        val maxTip = when {
-            atCap -> capTip
-            !canMax -> noCandyTip
-            else -> Text.literal("${gui("hint.level_max", maxLevel).string}\n${candyHave()}")
-        }
-        screen.button(Text.literal("+1"), x + 2, y, 14, 9, plusTip, canNext) {
+        val tip = if (atCap) gui("hint.level_cap_reached", cap) else gui("hint.level_rare_candy", haveRare)
+        screen.button(Text.literal("+1"), x + 2, y, 14, 9, tip, canNext) {
             screen.edit { it.copy(level = next) }
         }.also { if (!canNext && !atCap) it.labelColor = GuiKit.RED }
-        screen.button(gui("button.max"), x + 61, y, 17, 9, maxTip, canMax) {
+        screen.button(gui("button.max"), x + 61, y, 17, 9, tip, canMax) {
             screen.edit { it.copy(level = maxLevel) }
         }.also { if (!canMax && !atCap) it.labelColor = GuiKit.RED }
     }

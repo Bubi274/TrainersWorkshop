@@ -112,7 +112,6 @@ object EditorSessions {
                     maxHealth = current.maxHealth,
                     heldItemId = current.heldItemId,
                     heldItemCount = current.heldItemCount,
-                    experience = current.experience,
                 )
                 if (normalizedTarget == current) return EditorStatus("nothing_to_apply")
                 val options = PokemonEditing.options(pokemon)

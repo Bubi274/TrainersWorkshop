@@ -35,7 +35,6 @@ object PokemonEditing {
             species = pokemon.species.resourceIdentifier.toString(),
             aspects = pokemon.aspects.toList(),
             level = pokemon.level,
-            experience = pokemon.experience,
             shiny = pokemon.shiny,
             gender = pokemon.gender.name,
             nature = pokemon.nature.name.toString(),
@@ -71,14 +70,7 @@ object PokemonEditing {
             commonAbilities = commonAbilities,
             hiddenAbilities = hiddenAbilities,
             genders = allowedGenders(pokemon).map { it.name },
-            levelExp = levelExp(pokemon),
         )
-    }
-
-    /** Tổng EXP cần để đạt mỗi level (0..maxLevel) theo nhóm kinh nghiệm của Pokémon; ô 0 để trống. */
-    private fun levelExp(pokemon: Pokemon): List<Int> {
-        val group = pokemon.experienceGroup
-        return List(maxLevel() + 1) { level -> if (level < 1) 0 else group.getExperience(level) }
     }
 
     fun slot(index: Int, pokemon: Pokemon) = EditorSlot(index, snapshot(pokemon), options(pokemon))

@@ -31,8 +31,6 @@ data class PokemonEditData(
     val species: String,
     val aspects: List<String>,
     val level: Int,
-    /** Tổng EXP hiện có (pokemon.experience); dùng để tính kẹo cần cho level mục tiêu. */
-    val experience: Int = 0,
     val shiny: Boolean,
     val gender: String,
     /** Nature gốc (identifier). */
@@ -75,7 +73,6 @@ data class PokemonEditData(
         putString("species", species)
         put("aspects", stringList(aspects))
         putInt("level", level)
-        putInt("experience", experience)
         putBoolean("shiny", shiny)
         putString("gender", gender)
         putString("nature", nature)
@@ -101,7 +98,6 @@ data class PokemonEditData(
             species = nbt.getString("species"),
             aspects = readStringList(nbt, "aspects"),
             level = nbt.getInt("level"),
-            experience = nbt.getInt("experience"),
             shiny = nbt.getBoolean("shiny"),
             gender = nbt.getString("gender"),
             nature = nbt.getString("nature"),
@@ -137,11 +133,6 @@ data class PokemonEditOptions(
     /** Ability ẩn của loài (HiddenAbilityType). */
     val hiddenAbilities: List<String> = emptyList(),
     val genders: List<String>,
-    /**
-     * Tổng EXP cần để đạt từng level theo nhóm kinh nghiệm của Pokémon (chỉ số = level, ô 0 không dùng).
-     * Server tính bằng ExperienceGroup của Cobblemon; Survival dùng để tính kẹo cần cho level mục tiêu.
-     */
-    val levelExp: List<Int> = emptyList(),
 ) {
     fun toNbt(): NbtCompound = NbtCompound().apply {
         put("legalMoves", stringList(legalMoves))
@@ -151,7 +142,6 @@ data class PokemonEditOptions(
         put("commonAbilities", stringList(commonAbilities))
         put("hiddenAbilities", stringList(hiddenAbilities))
         put("genders", stringList(genders))
-        putIntArray("levelExp", levelExp.toIntArray())
     }
 
     companion object {
@@ -163,7 +153,6 @@ data class PokemonEditOptions(
             commonAbilities = readStringList(nbt, "commonAbilities"),
             hiddenAbilities = readStringList(nbt, "hiddenAbilities"),
             genders = readStringList(nbt, "genders"),
-            levelExp = nbt.getIntArray("levelExp").toList(),
         )
     }
 }

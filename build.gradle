@@ -44,6 +44,9 @@ dependencies {
     modCompileOnly "maven.modrinth:rctmod:${project.rctmod_version}"
     modCompileOnly "maven.modrinth:rctapi:${project.rctapi_version}"
 
+    // Unit test thuần (không cần Minecraft), ví dụ LevelRules.
+    testImplementation 'junit:junit:4.13.2'
+
     // Các phụ thuộc tuỳ chọn khác không cần để biên dịch:
     // - Cobblemon Raid Dens: chỉ dùng ID bảng loot.
     // - TMCraft, Only Bottle Caps: chỉ tra vật phẩm theo ID trong registry.
@@ -71,4 +74,8 @@ kotlin {
 
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
+}
+
+test {
+    useJUnit()
 }

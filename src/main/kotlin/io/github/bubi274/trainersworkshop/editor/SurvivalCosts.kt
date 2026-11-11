@@ -3,7 +3,6 @@ package io.github.bubi274.trainersworkshop.editor
 import com.cobblemon.mod.common.api.pokemon.stats.Stat
 import com.cobblemon.mod.common.api.pokemon.stats.Stats
 import com.cobblemon.mod.common.item.berry.FriendshipRaisingBerryItem
-import com.cobblemon.mod.common.item.interactive.CandyItem
 import com.cobblemon.mod.common.item.interactive.EVIncreaseItem
 import com.cobblemon.mod.common.item.interactive.HyperTrainingItem
 import com.cobblemon.mod.common.item.interactive.MintItem
@@ -30,20 +29,10 @@ object SurvivalCosts {
 
     const val RARE_CANDY_ID = "cobblemon:rare_candy"
 
-    /**
-     * Exp Candy của Cobblemon, xếp từ to đến nhỏ, kèm lượng EXP mỗi viên.
-     * Lượng EXP lấy từ hằng số của CandyItem (đối chiếu bytecode Cobblemon 1.7.3: calculator của từng viên trả đúng các giá trị này).
-     */
-    private val EXP_CANDIES: List<Pair<String, Int>> = listOf(
-        "cobblemon:exp_candy_xl" to CandyItem.DEFAULT_XL_CANDY_YIELD,
-        "cobblemon:exp_candy_l" to CandyItem.DEFAULT_L_CANDY_YIELD,
-        "cobblemon:exp_candy_m" to CandyItem.DEFAULT_M_CANDY_YIELD,
-        "cobblemon:exp_candy_s" to CandyItem.DEFAULT_S_CANDY_YIELD,
-        "cobblemon:exp_candy_xs" to CandyItem.DEFAULT_XS_CANDY_YIELD,
-    )
+    /** Các kẹo tăng level (chỉ Rare Candy); cho tooltip và mã băm túi đồ. */
+    fun levelCandies(): List<Item> = listOfNotNull(rareCandy())
 
-    /** Các kẹo dùng để tăng level (Rare Candy trước, rồi Exp Candy từ to đến nhỏ); cho tooltip và mã băm túi đồ. */
-    fun levelCandies(): List<Item> = (listOf(RARE_CANDY_ID) + EXP_CANDIES.map { it.first }).mapNotNull { itemById(it) }
+    fun rareCandy(): Item? = itemById(RARE_CANDY_ID)
 
     /** Level tối đa người chơi được lên: nhỏ hơn giữa level cap RCT (null = không có RCT) và level tối đa của Cobblemon. */
     fun levelLimit(cobblemonMax: Int, rctCap: Int?): Int = if (rctCap == null) cobblemonMax else minOf(cobblemonMax, rctCap)
@@ -177,8 +166,7 @@ object SurvivalCosts {
         if (target.uuid != current.uuid || target.species != current.species) error = "pokemon_changed"
         if (target.gender != current.gender || target.ball != current.ball || target.nature != current.nature) error = "survival_locked"
 
-        val levelProblem = addLevelCost(current, target, options, levelCap, have, lines)
-        levelProblem?.let { error = it }
+        addLevelCost(current, target, levelCap, lines)?.let { error = it }
 
         addIvCosts(current, target, lines)?.let { error = it }
         addEvCosts(current, target, lines, have)?.let { error = it }
@@ -193,7 +181,6 @@ object SurvivalCosts {
         lines.forEach { line -> line.item?.let { needed.merge(it, line.count, Int::plus) } }
 
         val problems = mutableSetOf<String>()
-        if (levelProblem != null) problems += "level"
         lines.filter { it.item == null }.forEach { problems += it.field }
         // Thiếu vật phẩm: đánh dấu mọi phần dùng vật phẩm đó (luôn kiểm tra, kể cả khi ở Creative).
         val short = needed.filter { (item, count) -> have(item) < count }.keys
@@ -202,90 +189,19 @@ object SurvivalCosts {
     }
 
     /**
-     * Level chỉ được tăng, tối đa [levelCap]. Kẹo tính từ EXP còn thiếu để tới level mục tiêu ([planLevel]).
-     * Trả về khoá lỗi: "level_decrease", "level_over_cap" hoặc "missing_items" (không đủ kẹo; dòng chi phí vẫn
-     * được thêm theo kẹo lý tưởng để giao diện hiện số kẹo còn thiếu).
+     * Level chỉ được tăng, tối đa [levelCap]; mỗi level tốn 1 Rare Candy ([LevelRules]).
+     * Trả về khoá lỗi "level_decrease" hoặc "level_over_cap"; thiếu kẹo được báo qua dòng chi phí (tô đỏ như các mục khác).
      */
-    private fun addLevelCost(
-        current: PokemonEditData,
-        target: PokemonEditData,
-        options: PokemonEditOptions,
-        levelCap: Int,
-        have: (Item) -> Int,
-        lines: MutableList<Line>,
-    ): String? {
-        if (target.level < current.level) return "level_decrease"
-        if (target.level == current.level) return null
-        if (target.level > levelCap || target.level >= options.levelExp.size) return "level_over_cap"
-        val plan = planLevel(current, target.level, options, have)
-        if (plan != null) {
-            plan.forEach { (item, count) -> lines += Line("level", item, count) }
-            return null
-        }
-        // Không đủ kẹo: hiện kẹo lý tưởng (nếu có) để người chơi biết còn thiếu gì.
-        val ideal = planLevel(current, target.level, options) { Int.MAX_VALUE }
-        ideal?.forEach { (item, count) -> lines += Line("level", item, count) }
-        if (ideal == null) lines += Line("level", null, 1, RARE_CANDY_ID)
-        return "missing_items"
-    }
-
-    /** EXP còn thiếu để tới [level] (theo nhóm kinh nghiệm của loài); null nếu thiếu dữ liệu. */
-    fun expToLevel(current: PokemonEditData, options: PokemonEditOptions, level: Int): Int? =
-        options.levelExp.getOrNull(level)?.let { it - current.experience }
-
-    /**
-     * Chọn kẹo để lên [level]:
-     * 1. Exp Candy từ to đến nhỏ, dùng nhiều nhất có thể mà không vượt quá EXP còn thiếu (và không quá số đang có).
-     * 2. Phần còn thiếu cuối cùng: nếu đúng 1 level thì dùng 1 Rare Candy; nếu không thì dùng 1 Exp Candy nhỏ nhất
-     *    đủ bù (phần EXP dư bị bỏ). Nếu không có Exp Candy đủ bù thì dùng đủ số Rare Candy cho các level còn thiếu.
-     * Trả về null nếu số kẹo hiện có không đủ.
-     */
-    fun planLevel(current: PokemonEditData, level: Int, options: PokemonEditOptions, have: (Item) -> Int): Map<Item, Int>? {
-        val need = expToLevel(current, options, level) ?: return null
-        if (level <= current.level || need <= 0) return null
-        val plan = LinkedHashMap<Item, Int>()
-        val candies = EXP_CANDIES.mapNotNull { (id, amount) -> itemById(id)?.let { it to amount } }
-        var remaining = need
-        for ((item, amount) in candies) {
-            val use = min(remaining / amount, have(item))
-            if (use > 0) {
-                plan[item] = use
-                remaining -= use * amount
-            }
-        }
-        if (remaining <= 0) return plan
-
-        // Level đạt được sau các Exp Candy: số level còn thiếu để tới mục tiêu.
-        val reachedExp = current.experience + (need - remaining)
-        var reachedLevel = current.level
-        while (reachedLevel + 1 < level && options.levelExp[reachedLevel + 1] <= reachedExp) reachedLevel++
-        val levelsLeft = level - reachedLevel
-        val rare = itemById(RARE_CANDY_ID)
-
-        if (levelsLeft == 1 && rare != null && have(rare) >= 1) {
-            plan.merge(rare, 1, Int::plus)
-            return plan
-        }
-        val filler = candies.reversed().firstOrNull { (item, amount) -> amount >= remaining && have(item) - (plan[item] ?: 0) >= 1 }
-        if (filler != null) {
-            plan.merge(filler.first, 1, Int::plus)
-            return plan
-        }
-        if (rare != null && have(rare) >= levelsLeft) {
-            plan.merge(rare, levelsLeft, Int::plus)
-            return plan
-        }
+    private fun addLevelCost(current: PokemonEditData, target: PokemonEditData, levelCap: Int, lines: MutableList<Line>): String? {
+        LevelRules.error(current.level, target.level, levelCap)?.let { return it }
+        val count = LevelRules.cost(current.level, target.level)
+        if (count > 0) lines += Line("level", rareCandy(), count, RARE_CANDY_ID)
         return null
     }
 
-    /** Level cao nhất (trong khoảng current.level+1..[levelCap]) mà số kẹo đang có cho phép; trả về level hiện tại nếu không lên được. */
-    fun maxAffordableLevel(current: PokemonEditData, options: PokemonEditOptions, levelCap: Int, have: (Item) -> Int): Int {
-        val top = minOf(levelCap, options.levelExp.size - 1)
-        for (level in top downTo current.level + 1) {
-            if (planLevel(current, level, options, have) != null) return level
-        }
-        return current.level
-    }
+    /** Level cao nhất đạt được: min(level cap, level hiện tại + số Rare Candy đang có). */
+    fun maxAffordableLevel(current: PokemonEditData, levelCap: Int, have: (Item) -> Int): Int =
+        LevelRules.maxLevel(current.level, levelCap, rareCandy()?.let(have) ?: 0)
 
     /**
      * IV có hai phần, giống Cobblemon:

@@ -54,7 +54,7 @@ items are used.
 | Switch to a move the Pokémon has already learned | Free |
 | Teach a new move | The TM for that move (TMCraft). The TM is used up. |
 | Make shiny | One Shiny Berry |
-| Raise the level | Exp Candies (XS +100, S +800, M +3000, L +10000, XL +30000 EXP) and Rare Candies (Cobblemon). See below. |
+| Raise the level by 1 | One Rare Candy (Cobblemon). See below. |
 
 IVs work the same way as in Cobblemon. Candies change the **effective IV** (Cobblemon's hyper training),
 not the base IV. Bottle Caps change the **base IV**, exactly like Only Bottle Caps does. When a Pokémon
@@ -64,10 +64,9 @@ press **Apply**, caps are used first, then candies.
 
 **Level.** The level can only go up, never down. The highest level you can reach is the lower of your
 Radical Cobblemon Trainers level cap and Cobblemon's maximum level (without RCT, only Cobblemon's maximum
-applies). At the cap, the buttons are locked. **+1** raises one level and **Max** raises as far as your
-candies allow. The editor works out how much EXP is missing, uses Exp Candies from biggest to smallest
-without going over, then finishes with one Rare Candy (if exactly one level is missing) or the smallest
-Exp Candy that covers the rest. The EXP left over from the last candy is lost. The EXP is added through
+applies). At the cap, the buttons are locked. Each level costs one Rare Candy: going from Lv 20 to Lv 23
+costs 3. **+1** raises one level and **Max** raises to the lower of the cap and your level plus the Rare Candies
+you have. The EXP is added through
 Cobblemon's normal EXP system, so the Pokémon learns level-up moves as usual. It never evolves by itself:
 Cobblemon shows its usual evolution prompt and you choose.
 
