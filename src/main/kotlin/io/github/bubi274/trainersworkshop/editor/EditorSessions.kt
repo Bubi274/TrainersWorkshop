@@ -61,9 +61,15 @@ object EditorSessions {
     private fun sendPartyState(player: ServerPlayerEntity, mode: EditorMode, status: EditorStatus?) {
         val party = Cobblemon.storage.getParty(player)
         val slots = (0 until 6).mapNotNull { index -> party.get(index)?.let { PokemonEditing.slot(index, it) } }
-        val state = EditorState(mode, slots, PokemonEditing.maxLevel(), PokemonEditing.allBalls(), bottleCapMode = BottleCapsCompat.mode())
+        val state = EditorState(mode, slots, PokemonEditing.maxLevel(), PokemonEditing.allBalls(), rules = survivalRules())
         sendState(player, state, status)
     }
+
+    /** Server settings the survival costs depend on (also sent to the client). */
+    private fun survivalRules() = SurvivalRules(
+        bottleCapMode = BottleCapsCompat.mode(),
+        infiniteTms = Cobblemon.config.infiniteTmUses,
+    )
 
     private fun handle(player: ServerPlayerEntity, nbt: NbtCompound) {
         val session = sessions[player.uuid] ?: return
@@ -122,26 +128,26 @@ object EditorSessions {
                 PokemonEditing.validateMoves(pokemon, normalizedTarget.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
                 // Server-side level cap: the lower of the RCT cap (if any) and Cobblemon's max level.
                 val levelCap = SurvivalCosts.levelLimit(PokemonEditing.maxLevel(), RctCompat.serverLevelCap(player))
-                val capMode = BottleCapsCompat.mode()
-                val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap, capMode) { player.inventory.count(it) }
+                val rules = survivalRules()
+                val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap, rules) { InventoryUtil.count(player.inventory, it) }
                 cost.error?.let { return EditorStatus(it, error = true) }
                 if (cost.problems.isNotEmpty()) return EditorStatus("missing_items", error = true)
 
                 val backup = pokemon.saveToNBT(registries, NbtCompound())
-                val toDeduct = LinkedHashMap(cost.needed)
-                var deducted = false
+                // TMs that aren't used up (Cobblemon infiniteTmUses) are needed but not in cost.consumed.
+                val toDeduct = LinkedHashMap(cost.consumed)
+                var taken: List<ItemStack> = emptyList()
                 try {
                     if (toDeduct.isNotEmpty()) {
-                        InventoryUtil.take(player, toDeduct)
-                        deducted = true
+                        taken = InventoryUtil.take(player, toDeduct)
                         player.playerScreenHandler.sendContentUpdates()
                     }
-                    PokemonEditing.applySurvival(pokemon, current, normalizedTarget, capMode)
+                    PokemonEditing.applySurvival(pokemon, current, normalizedTarget, rules.bottleCapMode)
                 } catch (e: Throwable) {
                     runCatching { pokemon.loadFromNBT(registries, backup) }
-                    if (deducted) {
+                    if (taken.isNotEmpty()) {
                         runCatching {
-                            InventoryUtil.refund(player, toDeduct)
+                            InventoryUtil.refund(player, taken)
                             player.playerScreenHandler.sendContentUpdates()
                         }
                     }
@@ -149,7 +155,7 @@ object EditorSessions {
                     return EditorStatus("apply_failed", error = true)
                 }
                 // Cobblemon 1.8 gives back an empty Glass Bottle for every Ability Capsule used (AbilityChangeItem).
-                val capsules = SurvivalCosts.abilityCapsule()?.let { toDeduct[it] } ?: 0
+                val capsules = SurvivalCosts.abilityCapsule()?.let { toDeduct[CostItem(it)] } ?: 0
                 if (capsules > 0) {
                     player.inventory.offerOrDrop(ItemStack(Items.GLASS_BOTTLE, capsules))
                     player.playerScreenHandler.sendContentUpdates()

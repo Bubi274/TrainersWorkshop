@@ -17,12 +17,15 @@ import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.client.ClientEditor
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import io.github.bubi274.trainersworkshop.editor.BottleCapMode
+import io.github.bubi274.trainersworkshop.editor.CostItem
 import io.github.bubi274.trainersworkshop.editor.EditorActions
 import io.github.bubi274.trainersworkshop.editor.EditorMode
 import io.github.bubi274.trainersworkshop.editor.EditorSlot
 import io.github.bubi274.trainersworkshop.editor.EditorState
+import io.github.bubi274.trainersworkshop.editor.InventoryUtil
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
 import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
+import io.github.bubi274.trainersworkshop.editor.SurvivalRules
 import io.github.bubi274.trainersworkshop.editor.TrainerEditing
 import io.github.bubi274.trainersworkshop.editor.readStringList
 import net.minecraft.client.font.TextRenderer
@@ -81,8 +84,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     val mode: EditorMode get() = state.mode
 
+    /** Survival: server settings the costs depend on. */
+    val rules: SurvivalRules get() = state.rules
+
     /** Survival: what a Bottle Cap does on the server (Only Bottle Caps version and config). */
-    val bottleCapMode: BottleCapMode get() = state.bottleCapMode
+    val bottleCapMode: BottleCapMode get() = rules.bottleCapMode
     val selectedSlot: EditorSlot? get() = state.slot(selectedIndex)
     val left: Int get() = (width - GuiKit.BASE_WIDTH) / 2
     val top: Int get() = max(4, (height - GuiKit.TOTAL_HEIGHT) / 2)
@@ -141,12 +147,15 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val slot = selectedSlot ?: return null
         val data = draft ?: return null
         val player = client?.player ?: return null
-        return SurvivalCosts.compute(slot.data, data, slot.options, levelCap, bottleCapMode) { player.inventory.count(it) }
+        return SurvivalCosts.compute(slot.data, data, slot.options, levelCap, rules) { InventoryUtil.count(player.inventory, it) }
     }
 
     fun hasProblem(field: String): Boolean = survivalCost()?.problems?.contains(field) == true
 
-    fun haveCount(item: net.minecraft.item.Item): Int = client?.player?.inventory?.count(item) ?: 0
+    fun haveCount(item: net.minecraft.item.Item): Int = haveCount(CostItem(item))
+
+    /** How many of [cost] the player has (a Cobblemon TM only counts if it holds the right move). */
+    fun haveCount(cost: CostItem): Int = client?.player?.inventory?.let { InventoryUtil.count(it, cost) } ?: 0
 
     /** The server sent a new state (after Apply or when the party changed). */
     fun update(newState: EditorState, newStatus: NbtCompound?) {
@@ -209,7 +218,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     private fun computeInventoryHash(): Int {
         val player = client?.player ?: return 0
-        return SurvivalCosts.inventoryHash(selectedSlot?.options) { player.inventory.count(it) }
+        return SurvivalCosts.inventoryHash(selectedSlot?.options) { InventoryUtil.count(player.inventory, it) }
     }
 
     /** Updates [levelCap]; returns true if the value changed. */
@@ -735,7 +744,9 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         for ((item, count) in entries) {
             val have = haveCount(item)
             val color = if (have >= count) GuiKit.WHITE else GuiKit.RED
-            lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", count, item.name, have).string, color)
+            // A Cobblemon TM with infiniteTmUses must be in the inventory but isn't used up.
+            val key = if (item in cost.consumed) "cost.line" else "cost.line_kept"
+            lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.$key", count, SurvivalCosts.costName(item), have).string, color)
         }
         // Item from an optional mod that isn't installed (Only Bottle Caps, TMCraft).
         cost.lines.filter { it.item == null }.map { it.missingItemId ?: it.field }.distinct().forEach { id ->

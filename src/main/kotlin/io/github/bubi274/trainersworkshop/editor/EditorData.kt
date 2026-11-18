@@ -134,6 +134,8 @@ data class PokemonEditOptions(
     val freeMoves: List<String>,
     /** Moves that a TMCraft TM can teach (learned by level or by TM). */
     val tmMoves: List<String>,
+    /** Moves that a Cobblemon 1.8 TM can teach (Learnset.tmLearnableMoves, only moves that have a Cobblemon TM). */
+    val cobblemonTmMoves: List<String> = emptyList(),
     val abilities: List<String>,
     /** The species' common abilities (CommonAbilityType). */
     val commonAbilities: List<String> = emptyList(),
@@ -145,6 +147,7 @@ data class PokemonEditOptions(
         put("legalMoves", stringList(legalMoves))
         put("freeMoves", stringList(freeMoves))
         put("tmMoves", stringList(tmMoves))
+        put("cobblemonTmMoves", stringList(cobblemonTmMoves))
         put("abilities", stringList(abilities))
         put("commonAbilities", stringList(commonAbilities))
         put("hiddenAbilities", stringList(hiddenAbilities))
@@ -156,6 +159,7 @@ data class PokemonEditOptions(
             legalMoves = readStringList(nbt, "legalMoves"),
             freeMoves = readStringList(nbt, "freeMoves"),
             tmMoves = readStringList(nbt, "tmMoves"),
+            cobblemonTmMoves = readStringList(nbt, "cobblemonTmMoves"),
             abilities = readStringList(nbt, "abilities"),
             commonAbilities = readStringList(nbt, "commonAbilities"),
             hiddenAbilities = readStringList(nbt, "hiddenAbilities"),
@@ -189,8 +193,8 @@ data class EditorState(
     val balls: List<String>,
     /** Only present in TRAINER mode. */
     val trainer: NbtCompound? = null,
-    /** Survival: what a Bottle Cap does with the Only Bottle Caps version and config on the server. */
-    val bottleCapMode: BottleCapMode = BottleCapMode.HYPER_TRAIN,
+    /** Survival: server settings the costs depend on. */
+    val rules: SurvivalRules = SurvivalRules(),
 ) {
     fun slot(index: Int): EditorSlot? = slots.firstOrNull { it.index == index }
 
@@ -200,7 +204,8 @@ data class EditorState(
         putInt("maxLevel", maxLevel)
         put("balls", stringList(balls))
         trainer?.let { put("trainer", it) }
-        putString("bottleCapMode", bottleCapMode.name)
+        putString("bottleCapMode", rules.bottleCapMode.name)
+        putBoolean("infiniteTms", rules.infiniteTms)
     }
 
     companion object {
@@ -210,10 +215,21 @@ data class EditorState(
             maxLevel = nbt.getInt("maxLevel"),
             balls = readStringList(nbt, "balls"),
             trainer = if (nbt.contains("trainer")) nbt.getCompound("trainer") else null,
-            bottleCapMode = BottleCapMode.fromName(nbt.getString("bottleCapMode")),
+            rules = SurvivalRules(
+                bottleCapMode = BottleCapMode.fromName(nbt.getString("bottleCapMode")),
+                infiniteTms = nbt.getBoolean("infiniteTms"),
+            ),
         )
     }
 }
+
+/** Server settings that the survival costs depend on; the server sends them with the editor state. */
+data class SurvivalRules(
+    /** What a Bottle Cap does with the Only Bottle Caps version and config on the server. */
+    val bottleCapMode: BottleCapMode = BottleCapMode.HYPER_TRAIN,
+    /** Cobblemon's infiniteTmUses config: Cobblemon TMs are still needed but not used up. */
+    val infiniteTms: Boolean = false,
+)
 
 /** Actions the client sends to the server. */
 object EditorActions {

@@ -10,6 +10,7 @@ import com.cobblemon.mod.common.api.pokeball.PokeBalls
 import com.cobblemon.mod.common.api.pokemon.Natures
 import com.cobblemon.mod.common.api.pokemon.experience.SidemodExperienceSource
 import com.cobblemon.mod.common.api.pokemon.stats.Stat
+import com.cobblemon.mod.common.api.tms.TechnicalMachines
 import com.cobblemon.mod.common.pokemon.Gender
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.abilities.HiddenAbilityType
@@ -60,6 +61,8 @@ object PokemonEditing {
         val free = pokemon.allAccessibleMoves.map { it.name } + current
         val learnset = pokemon.form.moves
         val tm = learnset.levelUpMoves.values.flatten().map { it.name } + learnset.tmMoves.map { it.name }
+        // Same rule as Cobblemon's TechnicalMachineItem: tmLearnableMoves; only moves that have a Cobblemon TM.
+        val cobblemonTm = learnset.tmLearnableMoves().filter { it in TechnicalMachines.moveToTM }.map { it.name }
         val abilities = pokemon.form.abilities.map { it.template.name } + pokemon.ability.name
         val commonAbilities = pokemon.form.abilities.filter { it.type == CommonAbilityType }.map { it.template.name }.distinct()
         val hiddenAbilities = pokemon.form.abilities.filter { it.type == HiddenAbilityType }.map { it.template.name }.distinct()
@@ -67,6 +70,7 @@ object PokemonEditing {
             legalMoves = legal.distinct().sorted(),
             freeMoves = free.distinct().sorted(),
             tmMoves = tm.distinct().sorted(),
+            cobblemonTmMoves = cobblemonTm.distinct().sorted(),
             abilities = abilities.distinct(),
             commonAbilities = commonAbilities,
             hiddenAbilities = hiddenAbilities,

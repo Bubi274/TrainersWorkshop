@@ -1,14 +1,18 @@
 package io.github.bubi274.trainersworkshop.editor
 
+import com.cobblemon.mod.common.CobblemonItems
+import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokemon.stats.Stat
 import com.cobblemon.mod.common.api.pokemon.stats.Stats
 import com.cobblemon.mod.common.item.berry.FriendshipRaisingBerryItem
 import com.cobblemon.mod.common.item.interactive.EVIncreaseItem
 import com.cobblemon.mod.common.item.interactive.HyperTrainingItem
 import com.cobblemon.mod.common.item.interactive.MintItem
+import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.registry.ModItems
 import net.minecraft.item.Item
 import net.minecraft.registry.Registries
+import net.minecraft.text.Text
 import net.minecraft.util.Identifier
 import kotlin.math.min
 
@@ -37,13 +41,30 @@ object SurvivalCosts {
     /** Highest level the player may reach: the lower of the RCT level cap (null = no RCT) and Cobblemon's max level. */
     fun levelLimit(cobblemonMax: Int, rctCap: Int?): Int = if (rctCap == null) cobblemonMax else minOf(cobblemonMax, rctCap)
 
-    /** One cost line, linked to the part being edited (so the right spot turns red). */
-    data class Line(val field: String, val item: Item?, val count: Int, val missingItemId: String? = null)
+    /**
+     * One cost line, linked to the part being edited (so the right spot turns red).
+     * [cost] null = the item's mod isn't installed ([missingItemId] says which item).
+     * [consumed] false = the item must be in the inventory but isn't used up (Cobblemon TMs with infiniteTmUses).
+     */
+    data class Line(
+        val field: String,
+        val cost: CostItem?,
+        val count: Int,
+        val missingItemId: String? = null,
+        val consumed: Boolean = true,
+    ) {
+        constructor(field: String, item: Item?, count: Int, missingItemId: String? = null) :
+            this(field, item?.let { CostItem(it) }, count, missingItemId, true)
+
+        val item: Item? get() = cost?.item
+    }
 
     data class Result(
         val lines: List<Line>,
-        /** Total needed of each item. */
-        val needed: Map<Item, Int>,
+        /** Total of each item that must be in the inventory. */
+        val needed: Map<CostItem, Int>,
+        /** Total of each item that Apply takes (the same as [needed] except for TMs that aren't used up). */
+        val consumed: Map<CostItem, Int>,
         /** Edited parts with missing items or invalid values (for example "iv.0", "move.2", "nature"). */
         val problems: Set<String>,
         /** Error key that blocks Apply completely (a change that isn't allowed in survival). */
@@ -129,10 +150,10 @@ object SurvivalCosts {
     /**
      * Works out a hash of the counts of the related items in the inventory, to notice changes.
      */
-    fun inventoryHash(options: PokemonEditOptions?, have: (Item) -> Int): Int {
+    fun inventoryHash(options: PokemonEditOptions?, have: (CostItem) -> Int): Int {
         var h = 1
         fun add(item: Item?) {
-            h = 31 * h + (if (item != null) have(item) else -1)
+            h = 31 * h + (if (item != null) have(CostItem(item)) else -1)
         }
         EDITOR_STATS.forEach { stat ->
             add(vitamin(stat))
@@ -150,13 +171,14 @@ object SurvivalCosts {
         add(abilityPatch())
         levelCandies().forEach { add(it) }
         mints.values.forEach { add(it) }
-        options?.tmMoves?.forEach { move -> add(itemById(tmId(move))) }
+        options?.tmMoves?.forEach { move -> add(tmcraftTm(move)) }
+        options?.cobblemonTmMoves?.forEach { move -> h = 31 * h + have(cobblemonTm(move)) }
         return h
     }
 
     /**
      * @param levelCap highest level allowed (see [levelLimit]).
-     * @param capMode what a Bottle Cap does with the installed Only Bottle Caps (sent by the server).
+     * @param rules server settings: what a Bottle Cap does, and whether Cobblemon TMs are used up (sent by the server).
      * @param have how many of an item the player has.
      */
     fun compute(
@@ -164,9 +186,10 @@ object SurvivalCosts {
         target: PokemonEditData,
         options: PokemonEditOptions,
         levelCap: Int,
-        capMode: BottleCapMode,
-        have: (Item) -> Int,
+        rules: SurvivalRules,
+        have: (CostItem) -> Int,
     ): Result {
+        val haveItem: (Item) -> Int = { have(CostItem(it)) }
         val lines = mutableListOf<Line>()
         var error: String? = null
 
@@ -176,24 +199,29 @@ object SurvivalCosts {
 
         addLevelCost(current, target, levelCap, lines)?.let { error = it }
 
-        addIvCosts(current, target, capMode, lines)?.let { error = it }
-        addEvCosts(current, target, lines, have)?.let { error = it }
+        addIvCosts(current, target, rules.bottleCapMode, lines)?.let { error = it }
+        addEvCosts(current, target, lines, haveItem)?.let { error = it }
         addNatureCost(current, target, lines)?.let { error = it }
         addAbilityCost(current, target, options, lines)?.let { error = it }
-        addMoveCosts(current, target, options, lines)?.let { error = it }
+        addMoveCosts(current, target, options, rules, have, lines)?.let { error = it }
         if (target.shiny != current.shiny) {
             if (!target.shiny) error = "survival_unshiny" else lines += Line("shiny", ModItems.SHINY_BERRY, 1)
         }
 
-        val needed = LinkedHashMap<Item, Int>()
-        lines.forEach { line -> line.item?.let { needed.merge(it, line.count, Int::plus) } }
+        val needed = LinkedHashMap<CostItem, Int>()
+        val consumed = LinkedHashMap<CostItem, Int>()
+        lines.forEach { line ->
+            val cost = line.cost ?: return@forEach
+            needed.merge(cost, line.count, Int::plus)
+            if (line.consumed) consumed.merge(cost, line.count, Int::plus)
+        }
 
         val problems = mutableSetOf<String>()
-        lines.filter { it.item == null }.forEach { problems += it.field }
+        lines.filter { it.cost == null }.forEach { problems += it.field }
         // Missing items: mark every part that uses that item (always checked, even in Creative).
-        val short = needed.filter { (item, count) -> have(item) < count }.keys
-        lines.filter { it.item in short }.forEach { problems += it.field }
-        return Result(lines, needed, problems, error)
+        val short = needed.filter { (cost, count) -> have(cost) < count }.keys
+        lines.filter { it.cost in short }.forEach { problems += it.field }
+        return Result(lines, needed, consumed, problems, error)
     }
 
     /**
@@ -346,13 +374,58 @@ object SurvivalCosts {
         }
     }
 
-    private fun addMoveCosts(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, lines: MutableList<Line>): String? {
+    /** Each new move needs one TM: a Cobblemon TM or a TMCraft TM ([tmFor]). */
+    private fun addMoveCosts(
+        current: PokemonEditData,
+        target: PokemonEditData,
+        options: PokemonEditOptions,
+        rules: SurvivalRules,
+        have: (CostItem) -> Int,
+        lines: MutableList<Line>,
+    ): String? {
         target.moves.forEachIndexed { slot, move ->
             if (move.isEmpty() || move == current.moves[slot] || move in options.freeMoves || move in current.moves) return@forEachIndexed
-            if (move !in options.tmMoves) return "survival_move"
-            val id = tmId(move)
-            lines += Line("move.$slot", itemById(id), 1, id)
+            val tm = tmFor(move, options, have) ?: return "survival_move"
+            lines += Line("move.$slot", tm, 1, consumed = TmRules.consumes(tmSource(tm), rules.infiniteTms))
         }
         return null
+    }
+
+    // ---------- TMs (Cobblemon 1.8 and TMCraft) ----------
+
+    /** The TMCraft TM item for [move], or null if TMCraft isn't installed (or has no TM for it). */
+    fun tmcraftTm(move: String): Item? = itemById(tmId(move))
+
+    /** A Cobblemon TM holding [move] (the cobblemon:tm_move component, see TMMoveComponent). */
+    fun cobblemonTm(move: String): CostItem = CostItem(CobblemonItems.TECHNICAL_MACHINE, move)
+
+    fun tmSource(cost: CostItem): TmSource = if (cost.tmMove != null) TmSource.COBBLEMON else TmSource.TMCRAFT
+
+    /** Whether some installed TM can teach [move] to this Pokémon. */
+    fun canTeachByTm(move: String, options: PokemonEditOptions): Boolean =
+        move in options.cobblemonTmMoves || (move in options.tmMoves && tmcraftTm(move) != null)
+
+    /** The TM used to teach [move] ([TmRules.choose]: a Cobblemon TM first), or null if no installed TM can teach it. */
+    fun tmFor(move: String, options: PokemonEditOptions, have: (CostItem) -> Int): CostItem? {
+        val cobblemon = cobblemonTm(move).takeIf { move in options.cobblemonTmMoves }
+        val tmcraft = tmcraftTm(move)?.takeIf { move in options.tmMoves }?.let { CostItem(it) }
+        return when (TmRules.choose(cobblemon != null, tmcraft != null, cobblemon?.let(have) ?: 0, tmcraft?.let(have) ?: 0)) {
+            TmSource.COBBLEMON -> cobblemon
+            TmSource.TMCRAFT -> tmcraft
+            null -> null
+        }
+    }
+
+    /** Name for the cost list and tooltips, saying which TM is used ("Cobblemon TM: Thunderbolt", "TMCraft TM-24: Thunderbolt"). */
+    fun costName(cost: CostItem): Text {
+        val move = cost.tmMove
+        if (move != null) {
+            val moveName = Moves.getByName(move)?.displayName ?: Text.literal(move)
+            return Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.cobblemon_tm", moveName)
+        }
+        if (Registries.ITEM.getId(cost.item).namespace == "tmcraft") {
+            return Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.tmcraft_tm", cost.item.name)
+        }
+        return cost.item.name
     }
 }

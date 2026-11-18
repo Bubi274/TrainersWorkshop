@@ -1,12 +1,15 @@
 package io.github.bubi274.trainersworkshop.client.gui
 
 import io.github.bubi274.trainersworkshop.editor.BottleCaps
+import io.github.bubi274.trainersworkshop.editor.CostItem
 import io.github.bubi274.trainersworkshop.editor.EDITOR_STATS
+import io.github.bubi274.trainersworkshop.editor.InventoryUtil
 import io.github.bubi274.trainersworkshop.editor.NO_CAP
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
 import io.github.bubi274.trainersworkshop.editor.PokemonEditOptions
 import io.github.bubi274.trainersworkshop.editor.PokemonEditing
 import io.github.bubi274.trainersworkshop.editor.SurvivalCosts
+import io.github.bubi274.trainersworkshop.editor.TmSource
 import net.minecraft.item.Item
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
@@ -37,7 +40,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     /** Tries a change: the button is only enabled if it is valid and there are enough items for [field]. */
     private fun allowed(field: String, change: (PokemonEditData) -> PokemonEditData): Boolean {
         val inventory = player?.inventory ?: return false
-        val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap, capMode) { inventory.count(it) }
+        val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap, screen.rules) { InventoryUtil.count(inventory, it) }
         val goldProblem = field.startsWith("iv.") && "iv.gold" in result.problems
         return result.error == null && field !in result.problems && !goldProblem
     }
@@ -246,33 +249,38 @@ class SurvivalMovesTab(screen: EditorScreen) : MovesTab(screen) {
         return move in slot.options.freeMoves || move in slot.data.moves
     }
 
-    private fun tmItem(move: String) = SurvivalCosts.itemById(SurvivalCosts.tmId(move))
+    /** The TM that would teach [move]: a Cobblemon TM first, then a TMCraft TM (SurvivalCosts.tmFor). */
+    private fun tm(move: String): CostItem? {
+        val slot = screen.selectedSlot ?: return null
+        return SurvivalCosts.tmFor(move, slot.options) { screen.haveCount(it) }
+    }
 
-    /** A move not learned yet: can only be picked if the TM exists (TMCraft) and the move can be taught by TM. */
+    /** A move not learned yet: can only be picked if an installed TM (Cobblemon or TMCraft) can teach it. */
     override fun isSelectable(move: String): Boolean {
         if (isFree(move)) return true
         val slot = screen.selectedSlot ?: return false
-        return move in slot.options.tmMoves && tmItem(move) != null
+        return SurvivalCosts.canTeachByTm(move, slot.options)
     }
 
-    /** "Free" / "TM x2" (you have 2 TMs) / "No TM" (can't be taught by TM). */
+    /** "Free" / "TM x2" (you have 2 of the TM that would be used) / "No TM" (can't be taught by TM). */
     override fun rowTag(move: String): Pair<Text, Int>? {
         if (move.isEmpty()) return null
         if (isFree(move)) return Pair(gui("tag.free"), GuiKit.GREEN)
-        val slot = screen.selectedSlot ?: return null
-        val tm = tmItem(move)
-        if (move !in slot.options.tmMoves || tm == null) return Pair(gui("tag.no_tm"), GuiKit.RED)
+        val tm = tm(move) ?: return Pair(gui("tag.no_tm"), GuiKit.RED)
         val have = screen.haveCount(tm)
         return Pair(gui("tag.tm", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
     }
 
+    /** "Cobblemon TM (have N)" or "TMCraft TM (have N)": which TM Apply will use. */
     override fun moveCostInfo(move: String): Pair<Text, Int> {
         if (isFree(move)) return Pair(gui("tag.free"), GuiKit.GREEN)
-        val slot = screen.selectedSlot ?: return Pair(gui("tag.no_tm"), GuiKit.RED)
-        val tm = tmItem(move)
-        if (move !in slot.options.tmMoves || tm == null) return Pair(gui("tag.no_tm"), GuiKit.RED)
+        val tm = tm(move) ?: return Pair(gui("tag.no_tm"), GuiKit.RED)
         val have = screen.haveCount(tm)
-        return Pair(gui("move.needs_tm", have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
+        val key = when (SurvivalCosts.tmSource(tm)) {
+            TmSource.COBBLEMON -> if (screen.rules.infiniteTms) "move.needs_tm.cobblemon_kept" else "move.needs_tm.cobblemon"
+            TmSource.TMCRAFT -> "move.needs_tm.tmcraft"
+        }
+        return Pair(gui(key, have), if (have > 0) GuiKit.GOLD else GuiKit.RED)
     }
 
     override fun pickerNote(): Text = gui("picker_note.survival")

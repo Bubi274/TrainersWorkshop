@@ -53,7 +53,7 @@ items are used.
 | Change nature | The mint for the new nature (Cobblemon). Works exactly like using the mint normally. |
 | Change ability | An Ability Capsule (to the other common ability) or an Ability Patch (to the hidden ability), from Cobblemon. Like in Cobblemon 1.8, each Ability Capsule gives back an empty Glass Bottle. |
 | Switch to a move the Pokémon has already learned | Free |
-| Teach a new move | The TM for that move (TMCraft). The TM is used up. |
+| Teach a new move | One TM for that move: a Cobblemon TM (`cobblemon:technical_machine`) or a TMCraft TM. If you have both, the Cobblemon TM is used. The TM is used up, except a Cobblemon TM when Cobblemon's `infiniteTmUses` config is on. |
 | Make shiny | One Shiny Berry |
 | Raise the level by 1 | One Rare Candy (Cobblemon). See below. |
 
@@ -71,6 +71,10 @@ A cap is locked when it would change nothing (Only Bottle Caps refuses it too). 
 stat it can. When a Pokémon has an effective IV, that value is used in battle. The IV tab shows how many of each item you have next
 to its button. Buttons are locked when you don't have enough items or the IV would leave 0–31. When you
 press **Apply**, caps are used first, then candies.
+
+**TMs.** A Cobblemon TM can teach the moves Cobblemon's own TMs teach (the species' TM moves). A TMCraft
+TM can teach the species' TM moves and level-up moves. The Moves tab and the Cost list show which TM
+will be used (for example "Cobblemon TM: Thunderbolt" or "TMCraft TM-24: Thunderbolt").
 
 **Level.** The level can only go up, never down. The highest level you can reach is the lower of your
 Radical Cobblemon Trainers level cap and Cobblemon's maximum level (without RCT, only Cobblemon's maximum
@@ -119,7 +123,7 @@ default team. Edited teams lose RCT's Mega/Tera/Dynamax settings. Details are in
 | Fabric Language Kotlin | 1.14.2+kotlin.2.4.21 or newer | yes |
 | Cobblemon Raid Dens | 0.13.5+1.21.1 | no: Shiny Berry raid drop |
 | Radical Cobblemon Trainers (rctmod + rctapi) | 0.19.2-beta / 0.16.2-beta | no: Trainer Editor, level cap in the Survival PokeEditor |
-| TMCraft | 1.4.19+1.8.4 | no: teaching new moves in the Survival PokeEditor |
+| TMCraft | 1.4.19+1.8.4 | no: TMCraft TMs in the Survival PokeEditor (Cobblemon TMs work without it) |
 | Only Bottle Caps | 1.5.0 | no: raising IVs in the Survival PokeEditor |
 
 Without an optional mod, the game still runs. The features that need it show as unavailable.
