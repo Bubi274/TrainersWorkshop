@@ -45,6 +45,9 @@ class BattleTab(screen: EditorScreen) : InfoRowsTab(screen) {
         screen.button(yesNo(gimmicks.gmax), cellX + 2, rowY(2) + 1, cellW - 4, 9, gmaxTip, active = view.canGmax || gimmicks.gmax) {
             send(TrainerEditing.SET_GMAX) { putBoolean("value", !gimmicks.gmax) }
         }
+        screen.button(yesNo(view.alpha), cellX + 2, rowY(3) + 1, cellW - 4, 9, gui("hint.alpha")) {
+            send(TrainerEditing.SET_ALPHA) { putBoolean("value", !view.alpha) }
+        }
         screen.button(gui("button.held_from_hand"), cellX + 2, rowY(4) + 1, 46, 9, gui("hint.held_from_hand")) {
             send(TrainerEditing.HELD_FROM_HAND) {}
         }
@@ -59,6 +62,7 @@ class BattleTab(screen: EditorScreen) : InfoRowsTab(screen) {
         drawLabel(context, 0, gui("field.tera"))
         drawLabel(context, 1, gui("field.dynamax"))
         drawLabel(context, 2, gui("field.gmax"), if (view.canGmax) GuiKit.WHITE else GuiKit.DIM)
+        drawLabel(context, 3, gui("field.alpha"))
         drawLabel(context, 4, gui("field.held"))
 
         // Row 5: the held item (icon + name), then notes in the light area below.
@@ -74,7 +78,8 @@ class BattleTab(screen: EditorScreen) : InfoRowsTab(screen) {
             matrices.pop()
             GuiKit.text(context, font, view.heldItem.name, cellX + 13, y, GuiKit.WHITE, maxWidth = cellW - 16, minScale = GuiKit.SMALL)
         }
-        GuiKit.textWrapped(context, font, gui("battle_note"), screen.panelX + 8, zoneY + 2, 118, 6, GuiKit.GRAY)
+        val lines = GuiKit.textWrapped(context, font, gui("battle_note"), screen.panelX + 8, zoneY + 2, 118, 3, GuiKit.GRAY)
+        GuiKit.textWrapped(context, font, gui("alpha_note"), screen.panelX + 8, zoneY + 4 + lines * 6, 118, 3, GuiKit.GOLD)
     }
 
     private fun teraName(tera: String): Text {

@@ -215,5 +215,8 @@
   "gui.trainers_workshop.hint.held_from_hand": "Gives this Pokémon a copy of the item in your main hand (for example a Mega Stone). Your item is not used up.",
   "gui.trainers_workshop.hint.held_clear": "Removes the held item.",
   "gui.trainers_workshop.battle_note": "RCT trainers use Tera, Dynamax and Mega Evolution through Mega Showdown. For Mega Evolution, give the Pokémon its Mega Stone as held item.",
-  "message.trainers_workshop.editor.trainer_no_gmax": "This species and its evolutions have no Gigantamax form."
+  "message.trainers_workshop.editor.trainer_no_gmax": "This species and its evolutions have no Gigantamax form.",
+  "gui.trainers_workshop.field.alpha": "Alpha",
+  "gui.trainers_workshop.hint.alpha": "Alpha look (bigger size, alpha eyes and mark) plus all IVs 31, more levels (config alphaTrainerLevelBonus, max level 100) and a TM move if it knows none. Turning it off restores the IVs, level and moves. Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule.",
+  "gui.trainers_workshop.alpha_note": "Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule."
 }

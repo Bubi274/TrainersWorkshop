@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.Species
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
+import io.github.bubi274.trainersworkshop.config.WorkshopConfig
 import net.minecraft.entity.Entity
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.nbt.NbtList
@@ -48,6 +49,7 @@ object TrainerEditing {
     const val SET_GMAX = "trainer_gmax"
     const val HELD_FROM_HAND = "trainer_held_hand"
     const val HELD_CLEAR = "trainer_held_clear"
+    const val SET_ALPHA = "trainer_alpha"
 
     private const val MAX_TEAM = 6
     private const val DEFAULT_LEVEL = 50
@@ -116,6 +118,7 @@ object TrainerEditing {
             SET_TERA, SET_DYNAMAX, SET_GMAX -> setGimmick(session, nbt)
             HELD_FROM_HAND -> setHeldItem(player, session, nbt, fromHand = true)
             HELD_CLEAR -> setHeldItem(player, session, nbt, fromHand = false)
+            SET_ALPHA -> setAlpha(session, nbt)
             SAVE -> save(player, session)
             RESET -> return reset(player, session)
             else -> EditorStatus("invalid_request", error = true)
@@ -149,7 +152,8 @@ object TrainerEditing {
         val gimmicks = TrainerGimmickRules.forNewSpecies(session.extras[index].gimmicks, created)
         TrainerGimmickRules.applyToPokemon(created, gimmicks)
         session.team[index] = created
-        session.extras[index] = session.extras[index].copy(gimmicks = gimmicks)
+        // A new Pokémon is never an Alpha, so there is nothing to restore later.
+        session.extras[index] = TrainerSlotExtras(gimmicks = gimmicks, alphaBackup = null)
         session.teamChanged = true
         return EditorStatus("species_changed", listOf(species.translatedName.string))
     }
@@ -194,6 +198,47 @@ object TrainerEditing {
         }
         TrainerGimmickRules.applyToPokemon(pokemon, gimmicks)
         session.extras[index] = session.extras[index].copy(gimmicks = gimmicks)
+        session.teamChanged = true
+        return null
+    }
+
+    /**
+     * Alpha toggle. On: Pokemon.isAlpha (size, alpha aspect/eyes, alpha mark) plus real stat boosts, because Cobblemon's
+     * alpha battle boost ("Wild Alpha" rule) only exists in wild battles: all IVs 31, +[WorkshopConfigData.alphaTrainerLevelBonus]
+     * levels (never above 100) and, like a wild Alpha, a random TM move of the species if it knows none.
+     * Off: restores the IVs, level and moves from before.
+     */
+    private fun setAlpha(session: TrainerEditorSession, nbt: NbtCompound): EditorStatus? {
+        val index = nbt.getInt("index")
+        val pokemon = session.team.getOrNull(index) ?: return EditorStatus("pokemon_changed", error = true)
+        val on = nbt.getBoolean("value")
+        if (on == pokemon.isAlpha) return null
+        val extras = session.extras[index]
+        if (on) {
+            val before = PokemonEditing.snapshot(pokemon)
+            pokemon.isAlpha = true
+            EDITOR_STATS.forEach { pokemon.setIV(it, PokemonEditing.MAX_IV) }
+            val cap = minOf(AlphaRules.MAX_LEVEL, PokemonEditing.maxLevel())
+            val level = AlphaRules.boostedLevel(pokemon.level, WorkshopConfig.data.alphaTrainerLevelBonus, cap)
+            if (level != pokemon.level) pokemon.level = level
+            val tmMoves = pokemon.form.moves.tmLearnableMoves().map { it.name }.toSet()
+            if (AlphaRules.needsTmMove(before.moves, tmMoves)) {
+                (tmMoves - before.moves.toSet()).randomOrNull()?.let { move ->
+                    val moves = before.moves.toMutableList()
+                    moves[AlphaRules.tmMoveSlot(moves)] = move
+                    PokemonEditing.applyMoves(pokemon, moves)
+                }
+            }
+            session.extras[index] = extras.copy(alphaBackup = AlphaBackup(before.ivs, before.level, before.moves))
+        } else {
+            pokemon.isAlpha = false
+            extras.alphaBackup?.let { backup ->
+                if (backup.level in 1..PokemonEditing.maxLevel()) pokemon.level = backup.level
+                if (backup.ivs.size == EDITOR_STATS.size) PokemonEditing.setIvs(pokemon, backup.ivs)
+                if (backup.moves.size == MOVE_SLOTS && backup.moves.any { it.isNotEmpty() }) PokemonEditing.applyMoves(pokemon, backup.moves)
+            }
+            session.extras[index] = extras.copy(alphaBackup = null)
+        }
         session.teamChanged = true
         return null
     }
@@ -294,6 +339,7 @@ object TrainerEditing {
         extras.toNbt().apply {
             putBoolean("canGmax", TrainerGimmickRules.canGmax(pokemon))
             putString("teraType", pokemon.teraType.id.path)
+            putBoolean("alpha", pokemon.isAlpha)
             val held = pokemon.heldItem()
             if (!held.isEmpty) put("heldItem", held.encode(registries))
         }

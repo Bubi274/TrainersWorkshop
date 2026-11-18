@@ -107,6 +107,11 @@ Right-click a trainer from Radical Cobblemon Trainers (RCT) to edit **that one t
   off) and the **held item** (copy the item in your main hand, or clear it). Mega Evolution comes from a
   held Mega Stone. RCT trainers use these gimmicks through Mega Showdown. Editing anything else, or
   changing the species, keeps the slot's gimmick settings.
+- **Alpha** (Battle tab): makes the Pokémon an Alpha (bigger, alpha eyes and mark). Because Cobblemon only
+  gives the Alpha battle boost in wild battles, the editor also sets all IVs to 31, adds levels
+  (`alphaTrainerLevelBonus` in the config, default 5, never above level 100) and, like a wild Alpha, teaches
+  a random TM move of the species if it knows none. Turning Alpha off restores the IVs, level and moves.
+  **Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule.**
 - **Loot** tab: add the item in your main hand (Shiny Berries work too), then set its count and drop
   chance. Choose whether the custom loot drops on **every win** or only on **each player's first
   win**, and whether the trainer's **default loot** still drops.
@@ -184,12 +189,14 @@ On first launch, the mod creates `config/trainers_workshop.json`:
 ```json
 {
   "raidTierSevenShinyBerryChance": 0.05,
-  "eggMoveGemCost": 3
+  "eggMoveGemCost": 3,
+  "alphaTrainerLevelBonus": 5
 }
 ```
 
 - `raidTierSevenShinyBerryChance` is the chance for a 7-star raid to drop a Shiny Berry, from `0.0` to `1.0`
   (`0.05` = 5%, `0` = disabled).
+- `alphaTrainerLevelBonus` is how many levels the Trainer Editor's Alpha toggle adds (`0` to `100`; the result never goes above level 100).
 - `eggMoveGemCost` is how many Type Gems teaching one egg move costs in the Survival PokeEditor (`1` to `64`).
 - After editing, restart the server to apply the change (`/reload` also re-reads the file when Cobblemon Raid Dens is installed).
 - To confirm the raid integration loaded, look for `Added Shiny Berry to cobblemonraiddens:raid/tier/tier_seven`

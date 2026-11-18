@@ -24,6 +24,7 @@ data class TrainerSlotView(
     /** The Pokémon's current tera type id, used when Tera is turned on. */
     val teraType: String,
     val heldItem: ItemStack,
+    val alpha: Boolean = false,
 )
 
 /** Trainer info sent by the server (name, loot...). */
@@ -54,6 +55,7 @@ data class TrainerView(
                     canGmax = slot.getBoolean("canGmax"),
                     teraType = slot.getString("teraType"),
                     heldItem = slot.get("heldItem")?.let { ItemStack.fromNbt(registries, it).orElse(null) } ?: ItemStack.EMPTY,
+                    alpha = slot.getBoolean("alpha"),
                 )
             },
         )

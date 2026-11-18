@@ -19,6 +19,15 @@ class TrainerExtrasNbtTest {
     }
 
     @Test
+    fun alphaBackupSurvivesARoundTrip() {
+        val extras = TrainerSlotExtras(
+            TrainerGimmicks(tera = "dragon"),
+            AlphaBackup(ivs = listOf(1, 2, 3, 4, 5, 6), level = 42, moves = listOf("tackle", "ember", "", "")),
+        )
+        assertEquals(extras, TrainerSlotExtras.fromNbt(extras.toNbt()))
+    }
+
+    @Test
     fun missingDataReadsAsNoGimmicks() {
         assertEquals(TrainerSlotExtras(), TrainerSlotExtras.fromNbt(NbtCompound()))
     }

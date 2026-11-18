@@ -37,17 +37,43 @@ data class TrainerGimmicks(
     }
 }
 
+/** IVs, level and moves of a Pokémon before the Trainer Editor made it an Alpha, so turning Alpha off restores them. */
+data class AlphaBackup(
+    val ivs: List<Int>,
+    val level: Int,
+    /** Always [MOVE_SLOTS] entries, "" is an empty slot. */
+    val moves: List<String>,
+) {
+    fun toNbt(): NbtCompound = NbtCompound().apply {
+        putIntArray("ivs", ivs.toIntArray())
+        putInt("level", level)
+        put("moves", stringList(moves))
+    }
+
+    companion object {
+        fun fromNbt(nbt: NbtCompound) = AlphaBackup(
+            ivs = nbt.getIntArray("ivs").toList(),
+            level = nbt.getInt("level"),
+            moves = readStringList(nbt, "moves"),
+        )
+    }
+}
+
 /** Everything the Trainer Editor stores for one team slot besides the Pokémon NBT. */
 data class TrainerSlotExtras(
     val gimmicks: TrainerGimmicks = TrainerGimmicks(),
+    /** Set while the editor's Alpha toggle is on for this slot. */
+    val alphaBackup: AlphaBackup? = null,
 ) {
     fun toNbt(): NbtCompound = NbtCompound().apply {
         put("gimmicks", gimmicks.toNbt())
+        alphaBackup?.let { put("alphaBackup", it.toNbt()) }
     }
 
     companion object {
         fun fromNbt(nbt: NbtCompound) = TrainerSlotExtras(
             gimmicks = TrainerGimmicks.fromNbt(nbt.getCompound("gimmicks")),
+            alphaBackup = if (nbt.contains("alphaBackup")) AlphaBackup.fromNbt(nbt.getCompound("alphaBackup")) else null,
         )
     }
 }
