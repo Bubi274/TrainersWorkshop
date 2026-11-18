@@ -140,7 +140,7 @@ GitHub builds the mod on every push (workflow `.github/workflows/build.yml`), so
 4. Unzip it and copy `trainers_workshop-<version>.jar` into your `mods` folder.
 
 Artifacts are kept for 30 days. If a build fails, the run also has a `test-reports` artifact.
-Pushing a tag such as `v2.1.0` also creates a GitHub Release with the jar attached (see **Releases**).
+Pushing a tag such as `v2.2.0` also creates a GitHub Release with the jar attached (see **Releases**).
 
 ## Building
 
@@ -150,7 +150,7 @@ Requires Java 21. From the project folder, run:
 ./gradlew build
 ```
 
-The mod file is `build/libs/trainers_workshop-2.1.0.jar`. Don't use the `-sources.jar` file.
+The mod file is `build/libs/trainers_workshop-2.2.0.jar`. Don't use the `-sources.jar` file.
 
 The first build downloads Minecraft and its libraries, so it takes a few minutes and needs access to
 `piston-meta.mojang.com`, `libraries.minecraft.net`, `maven.fabricmc.net`, `maven.impactdev.net` and
@@ -167,7 +167,7 @@ so test the raid drop, Trainer Editor, TMs and Bottle Caps in the real modpack.
 
 ## Installing in a modpack
 
-1. Copy `trainers_workshop-2.1.0.jar` into the `mods` folder of your COBBLEVERSE 1.8.0 instance.
+1. Copy `trainers_workshop-2.2.0.jar` into the `mods` folder of your COBBLEVERSE 1.8.0 instance.
 2. For a server, also copy it into the server's `mods` folder.
 
 ## Config
