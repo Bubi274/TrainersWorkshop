@@ -196,5 +196,22 @@
   "gui.trainers_workshop.nature.no_mint": "No mint available for %s",
   "gui.trainers_workshop.picker_note.survival": "Free: already known. TM xN: TMs you have. A Cobblemon TM is used before a TMCraft TM.",
   "gui.trainers_workshop.iv_detail": "Effective IV %s (base IV %s)",
-  "gui.trainers_workshop.held_item": "Held Item"
+  "gui.trainers_workshop.held_item": "Held Item",
+  "gui.trainers_workshop.tab.battle": "Battle",
+  "gui.trainers_workshop.field.tera": "Tera",
+  "gui.trainers_workshop.field.dynamax": "Dynamax",
+  "gui.trainers_workshop.field.gmax": "G-Max",
+  "gui.trainers_workshop.field.held": "Held item",
+  "gui.trainers_workshop.tera.off": "Off",
+  "gui.trainers_workshop.held_none": "Nothing",
+  "gui.trainers_workshop.button.held_from_hand": "From hand",
+  "gui.trainers_workshop.button.held_clear": "Clear",
+  "gui.trainers_workshop.hint.tera": "The type this Pokémon Terastallizes into in battle (Off = never). Click for the next type, Shift-click for the previous one.",
+  "gui.trainers_workshop.hint.dynamax": "Whether the trainer may Dynamax this Pokémon in battle.",
+  "gui.trainers_workshop.hint.gmax": "Gigantamax factor: Dynamax turns into Gigantamax.",
+  "gui.trainers_workshop.hint.gmax_unavailable": "This species and its evolutions have no Gigantamax form.",
+  "gui.trainers_workshop.hint.held_from_hand": "Gives this Pokémon a copy of the item in your main hand (for example a Mega Stone). Your item is not used up.",
+  "gui.trainers_workshop.hint.held_clear": "Removes the held item.",
+  "gui.trainers_workshop.battle_note": "RCT trainers use Tera, Dynamax and Mega Evolution through Mega Showdown. For Mega Evolution, give the Pokémon its Mega Stone as held item.",
+  "message.trainers_workshop.editor.trainer_no_gmax": "This species and its evolutions have no Gigantamax form."
 }

@@ -2,6 +2,7 @@ package io.github.bubi274.trainersworkshop.compat.rct
 
 import com.cobblemon.mod.common.pokemon.Pokemon
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.editor.TrainerGimmicks
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.entity.Entity
 import net.minecraft.entity.player.PlayerEntity
@@ -39,6 +40,14 @@ object RctCompat {
 
     /** Level cap to show in the UI, client side (PlayerState.get(player).levelCap). null without RCT or on error. */
     fun clientLevelCap(player: PlayerEntity): Int? = if (loaded) RctAccess.clientLevelCap(player) else null
+
+    /** Battle gimmicks of [defaultTeam] (Tera, Dynamax, Gigantamax), one per Pokémon. */
+    fun defaultGimmicks(entity: Entity, team: List<Pokemon>): List<TrainerGimmicks> =
+        if (loaded) RctAccess.defaultGimmicks(entity, team) else team.map { TrainerGimmicks() }
+
+    /** Gimmicks for a team saved before 2.2.0, taken from the original team slot by slot (see RctAccess). */
+    fun fallbackGimmicks(trainerId: String, team: List<Pokemon>): List<TrainerGimmicks> =
+        if (loaded) RctAccess.fallbackGimmicks(trainerId, team) else team.map { TrainerGimmicks() }
 
     /** Drops the team built for battles (after saving or resetting). */
     fun forget(entityUuid: UUID) {

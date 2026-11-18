@@ -1,6 +1,7 @@
 package io.github.bubi274.trainersworkshop.compat.rct
 
 import com.cobblemon.mod.common.pokemon.Pokemon
+import com.gitlab.srcmc.rctapi.api.models.Gimmicks
 import com.gitlab.srcmc.rctapi.api.trainer.Trainer
 import com.gitlab.srcmc.rctapi.api.trainer.TrainerNPC
 import com.gitlab.srcmc.rctapi.api.trainer.TrainerRegistry
@@ -10,6 +11,8 @@ import com.gitlab.srcmc.rctmod.api.data.sync.PlayerState
 import com.gitlab.srcmc.rctmod.world.entities.TrainerMob
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.editor.LootMode
+import io.github.bubi274.trainersworkshop.editor.TrainerGimmickRules
+import io.github.bubi274.trainersworkshop.editor.TrainerGimmicks
 import io.github.bubi274.trainersworkshop.editor.TrainerOverrides
 import net.minecraft.entity.Entity
 import net.minecraft.entity.player.PlayerEntity
@@ -39,6 +42,36 @@ object RctAccess {
         val npc = registry.getById(trainerId(entity), TrainerNPC::class.java) ?: return emptyList()
         return npc.team.map { it.clone(false, server.registryManager) }
     }
+
+    /**
+     * Battle gimmicks of the original team, read from RCT's GimmicksMap. [team] must be [defaultTeam]
+     * (clone(false) keeps the UUIDs the map is keyed by).
+     */
+    fun defaultGimmicks(entity: Entity, team: List<Pokemon>): List<TrainerGimmicks> {
+        val npc = registry.getById(trainerId(entity), TrainerNPC::class.java) ?: return team.map { TrainerGimmicks() }
+        return team.map { fromRct(npc.gimmicks.of(it)) }
+    }
+
+    /**
+     * Gimmicks for a team saved before 2.2.0 (no slot data). Its Pokémon have old UUIDs that RCT no longer knows
+     * after a restart, so take the gimmicks of the original Pokémon in the same slot when the species matches.
+     */
+    fun fallbackGimmicks(trainerId: String, team: List<Pokemon>): List<TrainerGimmicks> {
+        val npc = registry.getById(trainerId, TrainerNPC::class.java) ?: return team.map { TrainerGimmicks() }
+        return team.mapIndexed { index, pokemon ->
+            val original = npc.team.getOrNull(index)
+            if (original != null && original.species == pokemon.species) {
+                fromRct(npc.gimmicks.of(original))
+            } else {
+                TrainerGimmicks(gmax = pokemon.gmaxFactor)
+            }
+        }
+    }
+
+    private fun fromRct(gimmicks: Gimmicks?): TrainerGimmicks =
+        if (gimmicks == null) TrainerGimmicks() else TrainerGimmicks(gimmicks.tera() ?: "", gimmicks.dynamax(), gimmicks.gmax())
+
+    private fun toRct(gimmicks: TrainerGimmicks): Gimmicks = Gimmicks(gimmicks.tera.ifEmpty { null }, gimmicks.dynamax, gimmicks.gmax)
 
     fun defaultLootTable(entity: Entity): String =
         RCTMod.getInstance().trainerManager.getData(entity as TrainerMob)?.lootTableResource?.toString() ?: ""
@@ -101,11 +134,20 @@ object RctAccess {
         }
         val original = registry.getById(mob.trainerId, TrainerNPC::class.java) ?: return null
         val pokemon = team.map { Pokemon.loadFromNBT(server.registryManager, it) }.toTypedArray()
-        // TODO(rct): gimmicks (Mega/Tera/Dynamax) are linked to the original Pokémon UUIDs, so an edited team usually loses them.
+        // RCT looks gimmicks up by Pokémon UUID, so build a new map for these exact Pokémon from the saved slot data.
+        // Mega Evolution needs no entry: it comes from the held Mega Stone (Mega Showdown), which is part of the Pokémon NBT.
+        val slotGimmicks = override.slots?.map { it.gimmicks } ?: fallbackGimmicks(mob.trainerId, pokemon.toList())
+        val gimmicks = TrainerNPC.GimmicksMap()
+        pokemon.forEachIndexed { index, member ->
+            val slot = slotGimmicks.getOrNull(index) ?: TrainerGimmicks()
+            // Saved slot data wins; old saves keep the tera type / G-Max factor already in the Pokémon NBT.
+            if (override.slots != null) TrainerGimmickRules.applyToPokemon(member, slot)
+            gimmicks.to(member, toRct(slot))
+        }
         val npc = TrainerNPC(
             original.name,
             pokemon,
-            TrainerNPC.GimmicksMap(original.gimmicks),
+            gimmicks,
             original.bag,
             original.battleTheme,
             original.battleAI,

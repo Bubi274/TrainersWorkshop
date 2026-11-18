@@ -3,14 +3,28 @@ package io.github.bubi274.trainersworkshop.client.gui
 import io.github.bubi274.trainersworkshop.editor.LootEntry
 import io.github.bubi274.trainersworkshop.editor.LootMode
 import io.github.bubi274.trainersworkshop.editor.TrainerEditing
+import io.github.bubi274.trainersworkshop.editor.TrainerGimmicks
+import io.github.bubi274.trainersworkshop.editor.TrainerSlotExtras
 import io.github.bubi274.trainersworkshop.editor.enumValueOrNull
 import io.github.bubi274.trainersworkshop.editor.readCompoundList
+import io.github.bubi274.trainersworkshop.editor.readStringList
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.screen.Screen
+import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.registry.RegistryWrapper
 import net.minecraft.text.Text
 import kotlin.math.roundToInt
+
+/** Battle tab data for one team slot, sent by the server. */
+data class TrainerSlotView(
+    val gimmicks: TrainerGimmicks,
+    /** Whether this Pokémon (or an evolution) has a Gigantamax form. */
+    val canGmax: Boolean,
+    /** The Pokémon's current tera type id, used when Tera is turned on. */
+    val teraType: String,
+    val heldItem: ItemStack,
+)
 
 /** Trainer info sent by the server (name, loot...). */
 data class TrainerView(
@@ -21,6 +35,8 @@ data class TrainerView(
     val lootMode: LootMode,
     val keepDefaultLoot: Boolean,
     val loot: List<LootEntry>,
+    val teraTypes: List<String> = emptyList(),
+    val slots: List<TrainerSlotView> = emptyList(),
 ) {
     companion object {
         fun from(nbt: NbtCompound, registries: RegistryWrapper.WrapperLookup) = TrainerView(
@@ -31,6 +47,15 @@ data class TrainerView(
             lootMode = enumValueOrNull<LootMode>(nbt.getString("lootMode")) ?: LootMode.EVERY_WIN,
             keepDefaultLoot = nbt.getBoolean("keepDefaultLoot"),
             loot = readCompoundList(nbt, "loot").mapNotNull { LootEntry.fromNbt(registries, it) },
+            teraTypes = readStringList(nbt, "teraTypes"),
+            slots = readCompoundList(nbt, "slots").map { slot ->
+                TrainerSlotView(
+                    gimmicks = TrainerSlotExtras.fromNbt(slot).gimmicks,
+                    canGmax = slot.getBoolean("canGmax"),
+                    teraType = slot.getString("teraType"),
+                    heldItem = slot.get("heldItem")?.let { ItemStack.fromNbt(registries, it).orElse(null) } ?: ItemStack.EMPTY,
+                )
+            },
         )
     }
 }

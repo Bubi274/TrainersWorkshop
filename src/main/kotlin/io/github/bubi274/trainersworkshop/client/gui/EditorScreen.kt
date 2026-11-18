@@ -109,7 +109,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     private fun createTabs(): List<EditorTab> = when (state.mode) {
         EditorMode.SURVIVAL -> listOf(SurvivalStatsTab(this), SurvivalMovesTab(this), SurvivalNatureTab(this), SurvivalOtherTab(this))
-        EditorMode.TRAINER -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this), LootTab(this))
+        EditorMode.TRAINER -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this), BattleTab(this), LootTab(this))
         EditorMode.CREATIVE -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
     }
 

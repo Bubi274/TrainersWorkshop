@@ -101,6 +101,11 @@ Right-click a trainer from Radical Cobblemon Trainers (RCT) to edit **that one t
 - **Team** (up to 6 Pokémon): type a species name, then **Set** (replace the selected Pokémon) or
   **Add**. **Remove** deletes the selected Pokémon. Each Pokémon can be edited like in the Creative
   PokeEditor.
+- **Battle** tab: per Pokémon, the **Tera** type it Terastallizes into (or Off), **Dynamax**,
+  **Gigantamax** (only for species that have a G-Max form; changing to a species without one turns it
+  off) and the **held item** (copy the item in your main hand, or clear it). Mega Evolution comes from a
+  held Mega Stone. RCT trainers use these gimmicks through Mega Showdown. Editing anything else, or
+  changing the species, keeps the slot's gimmick settings.
 - **Loot** tab: add the item in your main hand (Shiny Berries work too), then set its count and drop
   chance. Choose whether the custom loot drops on **every win** or only on **each player's first
   win**, and whether the trainer's **default loot** still drops.
@@ -109,7 +114,8 @@ Right-click a trainer from Radical Cobblemon Trainers (RCT) to edit **that one t
 - **Reset** deletes all edits right away and brings back the trainer's original team and loot.
 
 Limits: edits belong to that trainer entity only. Trainers that a spawner spawns again later use their
-default team. Edited teams lose RCT's Mega/Tera/Dynamax settings. Details are in
+default team. Teams saved with version 2.1.0 get their gimmicks back from the original team when the
+species in the same slot still matches. Details are in
 [docs/trainer-editor-notes.md](docs/trainer-editor-notes.md).
 
 ## Dependencies

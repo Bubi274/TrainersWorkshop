@@ -8,6 +8,7 @@ import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import net.minecraft.entity.Entity
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.nbt.NbtList
+import net.minecraft.registry.RegistryWrapper
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
@@ -21,6 +22,8 @@ class TrainerEditorSession(
     val trainerName: String,
     val defaultLootTable: String,
     var team: MutableList<Pokemon>,
+    /** Extra data per team slot (battle gimmicks), always the same size and order as [team]. */
+    var extras: MutableList<TrainerSlotExtras>,
     var teamChanged: Boolean,
     var loot: MutableList<LootEntry>,
     var lootMode: LootMode,
@@ -40,6 +43,11 @@ object TrainerEditing {
     const val LOOT_REMOVE = "loot_remove"
     const val LOOT_MODE = "loot_mode"
     const val LOOT_KEEP_DEFAULT = "loot_keep_default"
+    const val SET_TERA = "trainer_tera"
+    const val SET_DYNAMAX = "trainer_dynamax"
+    const val SET_GMAX = "trainer_gmax"
+    const val HELD_FROM_HAND = "trainer_held_hand"
+    const val HELD_CLEAR = "trainer_held_clear"
 
     private const val MAX_TEAM = 6
     private const val DEFAULT_LEVEL = 50
@@ -60,12 +68,21 @@ object TrainerEditing {
         val trainerId = RctCompat.trainerId(entity)
         val override = TrainerOverrides.get(server)[entity.uuid]?.takeIf { it.trainerId == trainerId }
         val savedTeam = override?.team?.mapNotNull { runCatching { Pokemon.loadFromNBT(server.registryManager, it) }.getOrNull() }
+        val team = savedTeam ?: RctCompat.defaultTeam(entity, server)
+        val savedSlots = override?.slots?.takeIf { savedTeam != null && it.size == savedTeam.size }
+        val gimmicks = when {
+            savedTeam == null -> RctCompat.defaultGimmicks(entity, team)
+            savedSlots != null -> savedSlots.map { it.gimmicks }
+            // Saved before 2.2.0 (or a slot failed to load): recover the gimmicks from the original team.
+            else -> RctCompat.fallbackGimmicks(trainerId, savedTeam)
+        }
         return TrainerEditorSession(
             entityUuid = entity.uuid,
             trainerId = trainerId,
             trainerName = RctCompat.trainerName(entity).string,
             defaultLootTable = RctCompat.defaultLootTable(entity),
-            team = (savedTeam ?: RctCompat.defaultTeam(entity, server)).toMutableList(),
+            team = team.toMutableList(),
+            extras = gimmicks.map { TrainerSlotExtras(gimmicks = it) }.toMutableList(),
             teamChanged = false,
             loot = override?.loot?.toMutableList() ?: mutableListOf(),
             lootMode = override?.lootMode ?: LootMode.EVERY_WIN,
@@ -96,6 +113,9 @@ object TrainerEditing {
                 session.keepDefaultLoot = nbt.getBoolean("keep")
                 null
             }
+            SET_TERA, SET_DYNAMAX, SET_GMAX -> setGimmick(session, nbt)
+            HELD_FROM_HAND -> setHeldItem(player, session, nbt, fromHand = true)
+            HELD_CLEAR -> setHeldItem(player, session, nbt, fromHand = false)
             SAVE -> save(player, session)
             RESET -> return reset(player, session)
             else -> EditorStatus("invalid_request", error = true)
@@ -124,7 +144,12 @@ object TrainerEditing {
         val index = nbt.getInt("index")
         val old = session.team.getOrNull(index) ?: return EditorStatus("pokemon_changed", error = true)
         val species = findSpecies(nbt.getString("species")) ?: return EditorStatus("unknown_species", listOf(nbt.getString("species")), error = true)
-        session.team[index] = species.create(old.level)
+        val created = species.create(old.level)
+        // The slot keeps its battle gimmicks; Gigantamax turns off if the new species has no G-Max form.
+        val gimmicks = TrainerGimmickRules.forNewSpecies(session.extras[index].gimmicks, created)
+        TrainerGimmickRules.applyToPokemon(created, gimmicks)
+        session.team[index] = created
+        session.extras[index] = session.extras[index].copy(gimmicks = gimmicks)
         session.teamChanged = true
         return EditorStatus("species_changed", listOf(species.translatedName.string))
     }
@@ -134,6 +159,7 @@ object TrainerEditing {
         val species = findSpecies(nbt.getString("species")) ?: return EditorStatus("unknown_species", listOf(nbt.getString("species")), error = true)
         val level = session.team.maxOfOrNull { it.level } ?: DEFAULT_LEVEL
         session.team.add(species.create(level))
+        session.extras.add(TrainerSlotExtras())
         session.teamChanged = true
         return EditorStatus("pokemon_added", listOf(species.translatedName.string))
     }
@@ -143,8 +169,50 @@ object TrainerEditing {
         if (index !in session.team.indices) return EditorStatus("pokemon_changed", error = true)
         if (session.team.size <= 1) return EditorStatus("team_min", error = true)
         session.team.removeAt(index)
+        session.extras.removeAt(index)
         session.teamChanged = true
         return EditorStatus("pokemon_removed")
+    }
+
+    /** Tera type ("" = off), Dynamax or Gigantamax of one slot. Also written onto the Pokémon, like RCT does. */
+    private fun setGimmick(session: TrainerEditorSession, nbt: NbtCompound): EditorStatus? {
+        val index = nbt.getInt("index")
+        val pokemon = session.team.getOrNull(index) ?: return EditorStatus("pokemon_changed", error = true)
+        val old = session.extras[index].gimmicks
+        val gimmicks = when (nbt.getString("action")) {
+            SET_TERA -> {
+                val tera = nbt.getString("tera")
+                if (tera.isNotEmpty() && tera !in TrainerGimmickRules.teraTypes()) return EditorStatus("invalid_request", error = true)
+                old.copy(tera = tera)
+            }
+            SET_DYNAMAX -> old.copy(dynamax = nbt.getBoolean("value"))
+            else -> {
+                val gmax = nbt.getBoolean("value")
+                if (gmax && !TrainerGimmickRules.canGmax(pokemon)) return EditorStatus("trainer_no_gmax", error = true)
+                old.copy(gmax = gmax)
+            }
+        }
+        TrainerGimmickRules.applyToPokemon(pokemon, gimmicks)
+        session.extras[index] = session.extras[index].copy(gimmicks = gimmicks)
+        session.teamChanged = true
+        return null
+    }
+
+    /**
+     * Held item from the main hand (one item, the hand stack is not used up: Creative only) or cleared.
+     * Lets admins give Mega Stones (Mega Showdown reads the held item in battle).
+     */
+    private fun setHeldItem(player: ServerPlayerEntity, session: TrainerEditorSession, nbt: NbtCompound, fromHand: Boolean): EditorStatus? {
+        val pokemon = session.team.getOrNull(nbt.getInt("index")) ?: return EditorStatus("pokemon_changed", error = true)
+        if (fromHand) {
+            val hand = player.mainHandStack
+            if (hand.isEmpty) return EditorStatus("hand_empty", error = true)
+            pokemon.swapHeldItem(hand.copyWithCount(1), decrement = false)
+        } else {
+            pokemon.removeHeldItem()
+        }
+        session.teamChanged = true
+        return null
     }
 
     /** Adds the item held in the main hand (read from the server-side inventory, client data is not trusted). */
@@ -186,17 +254,15 @@ object TrainerEditing {
         val overrides = TrainerOverrides.get(player.server)
         val previous = overrides[session.entityUuid]
         val registries = player.server.registryManager
-        // Only save the team if it changed, so a trainer whose team wasn't changed keeps the original team (and RCT's gimmicks).
-        val team = if (session.teamChanged || previous?.team != null) {
-            session.team.map { it.saveToNBT(registries, NbtCompound()) }
-        } else {
-            null
-        }
+        // Only save the team if it changed, so a trainer whose team wasn't changed keeps the original RCT team. The slot extras (gimmicks) are saved with it.
+        val saveTeam = session.teamChanged || previous?.team != null
+        val team = if (saveTeam) session.team.map { it.saveToNBT(registries, NbtCompound()) } else null
         overrides.put(
             session.entityUuid,
             TrainerOverride(
                 trainerId = session.trainerId,
                 team = team,
+                slots = if (saveTeam) session.extras.toList() else null,
                 loot = session.loot.toList(),
                 lootMode = session.lootMode,
                 keepDefaultLoot = session.keepDefaultLoot,
@@ -223,6 +289,15 @@ object TrainerEditing {
         sendState(player, fresh, EditorStatus("trainer_reset", listOf(fresh.trainerName)))
     }
 
+    /** What the Battle tab shows for one slot. */
+    private fun slotView(pokemon: Pokemon, extras: TrainerSlotExtras, registries: RegistryWrapper.WrapperLookup): NbtCompound =
+        extras.toNbt().apply {
+            putBoolean("canGmax", TrainerGimmickRules.canGmax(pokemon))
+            putString("teraType", pokemon.teraType.id.path)
+            val held = pokemon.heldItem()
+            if (!held.isEmpty) put("heldItem", held.encode(registries))
+        }
+
     fun sendState(player: ServerPlayerEntity, session: TrainerEditorSession, status: EditorStatus?) {
         val registries = player.server.registryManager
         val trainer = NbtCompound().apply {
@@ -233,6 +308,12 @@ object TrainerEditing {
             putString("lootMode", session.lootMode.name)
             putBoolean("keepDefaultLoot", session.keepDefaultLoot)
             put("loot", NbtList().apply { session.loot.forEach { add(it.toNbt(registries)) } })
+            put("teraTypes", stringList(TrainerGimmickRules.teraTypes()))
+            put("slots", NbtList().apply {
+                session.team.forEachIndexed { index, pokemon ->
+                    add(slotView(pokemon, session.extras[index], registries))
+                }
+            })
         }
         val slots = session.team.mapIndexed { index, pokemon -> PokemonEditing.slot(index, pokemon) }
         val state = EditorState(EditorMode.TRAINER, slots, PokemonEditing.maxLevel(), PokemonEditing.allBalls(), trainer)

@@ -60,10 +60,13 @@ Editing **one trainer entity** is possible without touching RCT's data packs:
 2. **Despawning.** RCT trainers normally despawn when players walk away. Saving an edit therefore
    marks the trainer as persistent (`TrainerMob.setPersistent(true)`) so the edit is not lost.
    Reset to default does **not** make the trainer non-persistent again.
-3. **Gimmicks** (Mega, Tera, Dynamax settings from the trainer JSON) are linked to the Pokémon's
-   UUIDs. They carry over for Pokémon that are still the original ones in the same session. After
-   a restart or data pack reload the original team gets new UUIDs, so an edited team **loses its
-   gimmick settings**.
+3. **Gimmicks.** rctapi keeps `Gimmicks(tera, dynamax, gmax)` in `TrainerNPC.GimmicksMap`, keyed by
+   the Pokémon's UUID; `RCTBattleAI` reads it to decide whether to Terastallize or Dynamax. After a
+   restart or data pack reload RCT rebuilds the team with new UUIDs. Since 2.2.0 the editor stores
+   the gimmicks per team slot and builds a new `GimmicksMap` for the edited team, so nothing is lost.
+   Mega Evolution has no entry: it comes from the held Mega Stone (Mega Showdown), which is part of
+   the saved Pokémon. Teams saved by 2.1.0 recover their gimmicks from the original team slot when
+   the species matches.
 4. **Battle memory, defeat counts, series progress, advancements, cooldowns and dialog** still use
    the trainer id. They are not per-entity.
 5. **Mixin targets.** The hooks target RCT 0.19.2-beta (unchanged since 0.18.1-beta). A later RCT version may rename or change

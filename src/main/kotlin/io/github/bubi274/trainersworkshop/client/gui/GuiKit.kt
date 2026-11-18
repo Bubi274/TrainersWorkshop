@@ -99,6 +99,7 @@ object GuiKit {
     /** Hand-drawn 17x17 tab icon in the same style (Cobblemon has none for this). */
     val TAB_NATURE = own("tab_icon_nature.png")
     val TAB_OTHER = own("tab_icon_other.png")
+    val TAB_BATTLE = own("tab_icon_battle.png")
 
     // ---------- Text ----------
 

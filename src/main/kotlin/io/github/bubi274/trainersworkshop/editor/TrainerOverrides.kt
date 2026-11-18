@@ -31,10 +31,13 @@ data class LootEntry(val stack: ItemStack, val chance: Float) {
 /**
  * Edits for one specific RCT trainer (by entity UUID).
  * A null [team] means the original RCT team is used; Pokémon are stored as Cobblemon NBT.
+ * [slots] has the extra data (battle gimmicks) for each team slot, in the same order as [team];
+ * null for edits saved before 2.2.0 (then the gimmicks are taken from the original RCT team, see RctAccess).
  */
 class TrainerOverride(
     val trainerId: String,
     val team: List<NbtCompound>?,
+    val slots: List<TrainerSlotExtras>? = null,
     val loot: List<LootEntry>,
     val lootMode: LootMode,
     val keepDefaultLoot: Boolean,
@@ -46,6 +49,7 @@ class TrainerOverride(
     fun toNbt(registries: RegistryWrapper.WrapperLookup): NbtCompound = NbtCompound().apply {
         putString("trainerId", trainerId)
         team?.let { list -> put("team", NbtList().apply { list.forEach { add(it.copy()) } }) }
+        slots?.let { put("slots", TrainerSlotListCodec.write(it)) }
         put("loot", NbtList().apply { loot.forEach { add(it.toNbt(registries)) } })
         putString("lootMode", lootMode.name)
         putBoolean("keepDefaultLoot", keepDefaultLoot)
@@ -56,6 +60,7 @@ class TrainerOverride(
         fun fromNbt(registries: RegistryWrapper.WrapperLookup, nbt: NbtCompound) = TrainerOverride(
             trainerId = nbt.getString("trainerId"),
             team = if (nbt.contains("team")) readCompoundList(nbt, "team") else null,
+            slots = if (nbt.contains("slots")) TrainerSlotListCodec.read(nbt, "slots") else null,
             loot = readCompoundList(nbt, "loot").mapNotNull { LootEntry.fromNbt(registries, it) },
             lootMode = enumValueOrNull<LootMode>(nbt.getString("lootMode")) ?: LootMode.EVERY_WIN,
             keepDefaultLoot = nbt.getBoolean("keepDefaultLoot"),
