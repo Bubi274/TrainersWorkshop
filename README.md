@@ -130,6 +130,18 @@ Without an optional mod, the game still runs. The features that need it show as 
 
 Install the mod on **both the server and the client**.
 
+## Download a build
+
+GitHub builds the mod on every push (workflow `.github/workflows/build.yml`), so you don't need to build it yourself:
+
+1. Open the repository on GitHub and click the **Actions** tab.
+2. Click the newest **Build** run with a green check mark for your branch.
+3. At the bottom of the run page, under **Artifacts**, click `trainers_workshop-<version>` to download a zip.
+4. Unzip it and copy `trainers_workshop-<version>.jar` into your `mods` folder.
+
+Artifacts are kept for 30 days. If a build fails, the run also has a `test-reports` artifact.
+Pushing a tag such as `v2.1.0` also creates a GitHub Release with the jar attached (see **Releases**).
+
 ## Building
 
 Requires Java 21. From the project folder, run:
