@@ -34,7 +34,9 @@ jobs:
         run: echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Build (also runs the unit tests)
-        run: ./gradlew build --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew build --stacktrace 2>&1 | tee build-output.log
 
       - name: Upload the mod jar
         uses: actions/upload-artifact@v4
@@ -46,12 +48,38 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Show build errors as annotations (only when the build fails)
+        if: failure()
+        run: |
+          # Compiler errors and Gradle's "What went wrong" block become error annotations on the run page.
+          python3 - <<'PY'
+          import re
+          try:
+              lines = open("build-output.log", encoding="utf-8", errors="replace").read().splitlines()
+          except FileNotFoundError:
+              raise SystemExit(0)
+          errors = [l for l in lines if re.match(r"^e: ", l)]
+          wrong = []
+          for i, l in enumerate(lines):
+              if l.startswith("* What went wrong:"):
+                  wrong = lines[i:i + 40]
+                  break
+          def emit(title, chunk):
+              text = "\n".join(chunk).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title={title}::{text}")
+          for n in range(0, min(len(errors), 360), 40):
+              emit(f"Compile errors {n + 1}-{min(n + 40, len(errors))} of {len(errors)}", errors[n:n + 40])
+          if wrong:
+              emit("What went wrong", wrong)
+          PY
+
       - name: Upload test reports (only when the build fails)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: |
+            build-output.log
             build/reports/
             build/test-results/
           if-no-files-found: ignore
