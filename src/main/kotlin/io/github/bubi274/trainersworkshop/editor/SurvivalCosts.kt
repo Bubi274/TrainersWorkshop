@@ -108,8 +108,12 @@ object SurvivalCosts {
         Registries.ITEM.filterIsInstance<MintItem>().associateBy { it.nature.name.toString() }
     }
 
+    // EVIncreaseItem is an interface since Cobblemon 1.8 (VitaminItem, FeatherItem), so keep the Item and read the stat from it.
     private fun evItems(amount: Int): Map<Stat, Item> =
-        Registries.ITEM.filterIsInstance<EVIncreaseItem>().filter { it.evIncreaseAmount == amount }.associateBy { it.stat }
+        Registries.ITEM.mapNotNull { item ->
+            val ev = item as? EVIncreaseItem ?: return@mapNotNull null
+            if (ev.evIncreaseAmount == amount) ev.stat to item else null
+        }.toMap()
 
     fun itemById(id: String): Item? {
         val parsed = Identifier.tryParse(id) ?: return null
