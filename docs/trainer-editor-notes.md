@@ -2,10 +2,13 @@
 
 These notes record how Radical Cobblemon Trainers (RCT) works and what that means for editing one
 trainer in the world. They come from reading the class files of the exact versions in the
-Cobbleverse modpack with `javap`:
+COBBLEVERSE modpack with `javap`:
 
-- `rctmod-fabric-1.21.1-0.18.1-beta`
-- `rctapi-fabric-1.21.1-0.15.2-beta`
+- `rctmod-fabric-1.21.1-0.19.2-beta` (COBBLEVERSE 1.8.0; first checked on 0.18.1-beta)
+- `rctapi-fabric-1.21.1-0.16.2-beta` (COBBLEVERSE 1.8.0; first checked on 0.15.2-beta)
+
+Between those versions, `RCTMod.makeBattle` has the same bytecode and `TrainerMob.dropBattleLoot`
+has the same signature, so the mixin targets below did not change.
 
 ## How RCT stores trainers
 
@@ -63,7 +66,7 @@ Editing **one trainer entity** is possible without touching RCT's data packs:
    gimmick settings**.
 4. **Battle memory, defeat counts, series progress, advancements, cooldowns and dialog** still use
    the trainer id. They are not per-entity.
-5. **Mixin targets.** The hooks target RCT 0.18.1-beta. A later RCT version may rename or change
+5. **Mixin targets.** The hooks target RCT 0.19.2-beta (unchanged since 0.18.1-beta). A later RCT version may rename or change
    `RCTMod.makeBattle` or `TrainerMob.dropBattleLoot`. The mixins are written not to crash the game
    in that case (`require = 0`), and the mod logs a warning at startup if the methods are missing.
    The Trainer Editor screen still opens, but the edits would have no effect in battle.

@@ -103,14 +103,14 @@ default team. Edited teams lose RCT's Mega/Tera/Dynamax settings. Details are in
 | Mod | Version | Required |
 | --- | --- | --- |
 | Minecraft | 1.21.1 | yes |
-| Fabric Loader | 0.17.2 or newer | yes |
-| Fabric API | 0.116.17+1.21.1 | yes |
-| Cobblemon | 1.7.3+1.21.1 (Fabric) | yes |
-| Fabric Language Kotlin | 1.13.6 or newer (bundled with Cobblemon) | yes |
-| Cobblemon Raid Dens | any | no: Shiny Berry raid drop |
-| Radical Cobblemon Trainers (rctmod + rctapi) | 0.18.1-beta / 0.15.2-beta | no: Trainer Editor, level cap in the Survival PokeEditor |
-| TMCraft | 1.4.18+1.7.3 | no: teaching new moves in the Survival PokeEditor |
-| Only Bottle Caps | 1.3.0 | no: raising IVs in the Survival PokeEditor |
+| Fabric Loader | 0.19.5 or newer | yes |
+| Fabric API | 0.116.18+1.21.1 | yes |
+| Cobblemon | 1.8.4+1.21.1 (Fabric) | yes |
+| Fabric Language Kotlin | 1.14.2+kotlin.2.4.21 or newer | yes |
+| Cobblemon Raid Dens | 0.13.5+1.21.1 | no: Shiny Berry raid drop |
+| Radical Cobblemon Trainers (rctmod + rctapi) | 0.19.2-beta / 0.16.2-beta | no: Trainer Editor, level cap in the Survival PokeEditor |
+| TMCraft | 1.4.19+1.8.4 | no: teaching new moves in the Survival PokeEditor |
+| Only Bottle Caps | 1.5.0 | no: raising IVs in the Survival PokeEditor |
 
 Without an optional mod, the game still runs. The features that need it show as unavailable.
 
@@ -124,7 +124,7 @@ Requires Java 21. From the project folder, run:
 ./gradlew build
 ```
 
-The mod file is `build/libs/trainers_workshop-1.0.0.jar`. Don't use the `-sources.jar` file.
+The mod file is `build/libs/trainers_workshop-2.1.0.jar`. Don't use the `-sources.jar` file.
 
 The first build downloads Minecraft and its libraries, so it takes a few minutes and needs access to
 `piston-meta.mojang.com`, `libraries.minecraft.net`, `maven.fabricmc.net`, `maven.impactdev.net` and
@@ -141,7 +141,7 @@ so test the raid drop, Trainer Editor, TMs and Bottle Caps in the real modpack.
 
 ## Installing in a modpack
 
-1. Copy `trainers_workshop-1.0.0.jar` into the `mods` folder of your Cobbleverse instance.
+1. Copy `trainers_workshop-2.1.0.jar` into the `mods` folder of your COBBLEVERSE 1.8.0 instance.
 2. For a server, also copy it into the server's `mods` folder.
 
 ## Config

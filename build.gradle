@@ -11,12 +11,12 @@ base {
 }
 
 repositories {
-    // Maven chính thức của Cobblemon
+    // Official Cobblemon maven
     maven {
         name = 'Cobblemon'
         url = 'https://maven.impactdev.net/repository/development/'
     }
-    // Modrinth maven: chỉ dùng cho Radical Cobblemon Trainers (rctmod, rctapi)
+    // Modrinth maven: only used for Radical Cobblemon Trainers (rctmod, rctapi)
     exclusiveContent {
         forRepository {
             maven {
@@ -39,17 +39,17 @@ dependencies {
     modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
     modImplementation "com.cobblemon:fabric:${project.cobblemon_version}"
 
-    // Radical Cobblemon Trainers: tuỳ chọn, chỉ cần lúc biên dịch (không đóng gói vào mod).
-    // Phiên bản khớp modpack Cobbleverse: rctmod 0.18.1-beta, rctapi 0.15.2-beta.
+    // Radical Cobblemon Trainers: optional, only needed at compile time (not bundled into the mod).
+    // Versions match the COBBLEVERSE 1.8.0 modpack: rctmod 0.19.2-beta, rctapi 0.16.2-beta.
     modCompileOnly "maven.modrinth:rctmod:${project.rctmod_version}"
     modCompileOnly "maven.modrinth:rctapi:${project.rctapi_version}"
 
-    // Unit test thuần (không cần Minecraft), ví dụ LevelRules.
+    // Plain unit tests (no Minecraft needed), for example LevelRules.
     testImplementation 'junit:junit:4.13.2'
 
-    // Các phụ thuộc tuỳ chọn khác không cần để biên dịch:
-    // - Cobblemon Raid Dens: chỉ dùng ID bảng loot.
-    // - TMCraft, Only Bottle Caps: chỉ tra vật phẩm theo ID trong registry.
+    // Other optional dependencies are not needed to compile:
+    // - Cobblemon Raid Dens: only its loot table ID is used.
+    // - TMCraft, Only Bottle Caps: items are only looked up by ID in the registry.
 }
 
 processResources {
