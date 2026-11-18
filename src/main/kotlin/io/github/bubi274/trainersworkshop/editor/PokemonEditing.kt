@@ -9,6 +9,7 @@ import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokeball.PokeBalls
 import com.cobblemon.mod.common.api.pokemon.Natures
 import com.cobblemon.mod.common.api.pokemon.experience.SidemodExperienceSource
+import com.cobblemon.mod.common.api.pokemon.stats.Stat
 import com.cobblemon.mod.common.pokemon.Gender
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.cobblemon.mod.common.pokemon.abilities.HiddenAbilityType
@@ -149,16 +150,17 @@ object PokemonEditing {
     }
 
     /** Writes the survival changes (costs already checked with SurvivalCosts). Only changes IVs, EVs, nature (mint), moves, shiny. */
-    fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData) {
+    fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData, capMode: BottleCapMode) {
         // 0) Level first (like the Creative version), because level-up moves depend on it.
         applyLevelByExperience(pokemon, target.level)
-        // 1) Bottle Cap / Withered Bottle Cap: Only Bottle Caps changes the base IV with Pokemon.setIV.
-        setIvs(pokemon, target.ivs)
+        // 1) Bottle Cap / Withered Bottle Cap: the same calls as Only Bottle Caps ([applyBottleCap]).
+        EDITOR_STATS.forEachIndexed { i, stat ->
+            SurvivalCosts.capValue(current, target, i, capMode)?.let { applyBottleCap(pokemon, stat, it, capMode) }
+        }
         // TODO(build): test in game that the result is exactly the same as eating the candies one by one (see the "effective IV" tooltip).
         // 2) IV candies: like Cobblemon's HyperTrainingItem, each candy calls
         //    hyperTrainIV(stat, effective IV ± 1); the base IV doesn't change.
         EDITOR_STATS.forEachIndexed { i, stat ->
-            if (target.hyperIvs[i] == current.hyperIvs[i]) return@forEachIndexed
             val goal = target.effectiveIv(i)
             repeat(SurvivalCosts.MAX_IV + 1) {
                 val effective = pokemon.ivs.getEffectiveBattleIV(stat)
@@ -166,6 +168,14 @@ object PokemonEditing {
                 pokemon.hyperTrainIV(stat, if (goal > effective) effective + 1 else effective - 1)
                 // A Cobblemon event can cancel hyper training: stop so the loop doesn't run forever.
                 if (pokemon.ivs.getEffectiveBattleIV(stat) == effective) return@forEachIndexed
+            }
+        }
+        // The IVs must now be exactly the planned ones; otherwise Apply restores the Pokémon and refunds the items.
+        EDITOR_STATS.forEachIndexed { i, stat ->
+            val base = pokemon.ivs.getOrDefault(stat)
+            val effective = pokemon.ivs.getEffectiveBattleIV(stat)
+            check(base == target.ivs[i] && effective == target.effectiveIv(i)) {
+                "Expected $stat IV ${target.ivs[i]} (effective ${target.effectiveIv(i)}) but got $base (effective $effective)"
             }
         }
         setEvs(pokemon, target.evs)
@@ -196,6 +206,15 @@ object PokemonEditing {
         val missing = pokemon.getExperienceToLevel(level)
         if (missing > 0) pokemon.addExperience(SidemodExperienceSource(TrainersWorkshop.MOD_ID), missing)
         check(pokemon.level == level) { "Expected level $level but got ${pokemon.level}" }
+    }
+
+    /**
+     * Uses one Bottle Cap on [stat] exactly like Only Bottle Caps (BottleCap.applyToPokemon in OBC 1.3.0 / 1.5.0):
+     * Pokemon.setIV unless the mode is hyper training only, then IVs.setHyperTrainedIV unless the mode is base IV only.
+     */
+    private fun applyBottleCap(pokemon: Pokemon, stat: Stat, value: Int, capMode: BottleCapMode) {
+        if (capMode != BottleCapMode.HYPER_TRAIN) pokemon.setIV(stat, value)
+        if (capMode != BottleCapMode.BASE_IV) pokemon.ivs.setHyperTrainedIV(stat, value)
     }
 
     fun setIvs(pokemon: Pokemon, ivs: List<Int>) {

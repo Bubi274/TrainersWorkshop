@@ -57,10 +57,15 @@ data class PokemonEditData(
     /** Held item (only shown, not editable). */
     val heldItemId: String = "",
     val heldItemCount: Int = 0,
-    /** Survival: use a Gold Bottle Cap to raise all 6 base IVs to 31. */
+    /** Survival: use a Gold Bottle Cap on every stat it would change (sets them to 31, see [BottleCapMode]). */
     val useGoldCap: Boolean = false,
-    /** Survival: use a Gold Withered Bottle Cap to lower all 6 base IVs to 0. */
+    /** Survival: use a Gold Withered Bottle Cap on every stat it would change (sets them to 0, see [BottleCapMode]). */
     val useGoldWithered: Boolean = false,
+    /**
+     * Survival: the Bottle Cap planned for each stat: 31 (Bottle Cap), 0 (Withered Bottle Cap) or [NO_CAP].
+     * [ivs] and [hyperIvs] hold the result after the caps and candies (see SurvivalCosts.planIvs).
+     */
+    val caps: List<Int> = List(EDITOR_STATS.size) { NO_CAP },
 ) {
     /** Effective IV (same as Cobblemon's IVs.getEffectiveBattleIV). */
     fun effectiveIv(index: Int): Int = hyperIvs[index].takeIf { it >= 0 } ?: ivs[index]
@@ -90,6 +95,7 @@ data class PokemonEditData(
         putInt("heldItemCount", heldItemCount)
         putBoolean("useGoldCap", useGoldCap)
         putBoolean("useGoldWithered", useGoldWithered)
+        putIntArray("caps", caps.toIntArray())
     }
 
     companion object {
@@ -115,6 +121,7 @@ data class PokemonEditData(
             heldItemCount = nbt.getInt("heldItemCount"),
             useGoldCap = nbt.getBoolean("useGoldCap"),
             useGoldWithered = nbt.getBoolean("useGoldWithered"),
+            caps = fixedSize(nbt.getIntArray("caps").toList(), EDITOR_STATS.size, NO_CAP),
         )
     }
 }
@@ -182,6 +189,8 @@ data class EditorState(
     val balls: List<String>,
     /** Only present in TRAINER mode. */
     val trainer: NbtCompound? = null,
+    /** Survival: what a Bottle Cap does with the Only Bottle Caps version and config on the server. */
+    val bottleCapMode: BottleCapMode = BottleCapMode.HYPER_TRAIN,
 ) {
     fun slot(index: Int): EditorSlot? = slots.firstOrNull { it.index == index }
 
@@ -191,6 +200,7 @@ data class EditorState(
         putInt("maxLevel", maxLevel)
         put("balls", stringList(balls))
         trainer?.let { put("trainer", it) }
+        putString("bottleCapMode", bottleCapMode.name)
     }
 
     companion object {
@@ -200,6 +210,7 @@ data class EditorState(
             maxLevel = nbt.getInt("maxLevel"),
             balls = readStringList(nbt, "balls"),
             trainer = if (nbt.contains("trainer")) nbt.getCompound("trainer") else null,
+            bottleCapMode = BottleCapMode.fromName(nbt.getString("bottleCapMode")),
         )
     }
 }

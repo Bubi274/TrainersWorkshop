@@ -3,11 +3,14 @@ package io.github.bubi274.trainersworkshop.editor
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.battles.BattleRegistry
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.compat.BottleCapsCompat
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import io.github.bubi274.trainersworkshop.network.EditorActionPayload
 import io.github.bubi274.trainersworkshop.network.EditorStatePayload
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.item.ItemStack
+import net.minecraft.item.Items
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
@@ -58,7 +61,8 @@ object EditorSessions {
     private fun sendPartyState(player: ServerPlayerEntity, mode: EditorMode, status: EditorStatus?) {
         val party = Cobblemon.storage.getParty(player)
         val slots = (0 until 6).mapNotNull { index -> party.get(index)?.let { PokemonEditing.slot(index, it) } }
-        sendState(player, EditorState(mode, slots, PokemonEditing.maxLevel(), PokemonEditing.allBalls()), status)
+        val state = EditorState(mode, slots, PokemonEditing.maxLevel(), PokemonEditing.allBalls(), bottleCapMode = BottleCapsCompat.mode())
+        sendState(player, state, status)
     }
 
     private fun handle(player: ServerPlayerEntity, nbt: NbtCompound) {
@@ -118,7 +122,8 @@ object EditorSessions {
                 PokemonEditing.validateMoves(pokemon, normalizedTarget.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
                 // Server-side level cap: the lower of the RCT cap (if any) and Cobblemon's max level.
                 val levelCap = SurvivalCosts.levelLimit(PokemonEditing.maxLevel(), RctCompat.serverLevelCap(player))
-                val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap) { player.inventory.count(it) }
+                val capMode = BottleCapsCompat.mode()
+                val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap, capMode) { player.inventory.count(it) }
                 cost.error?.let { return EditorStatus(it, error = true) }
                 if (cost.problems.isNotEmpty()) return EditorStatus("missing_items", error = true)
 
@@ -131,7 +136,7 @@ object EditorSessions {
                         deducted = true
                         player.playerScreenHandler.sendContentUpdates()
                     }
-                    PokemonEditing.applySurvival(pokemon, current, normalizedTarget)
+                    PokemonEditing.applySurvival(pokemon, current, normalizedTarget, capMode)
                 } catch (e: Throwable) {
                     runCatching { pokemon.loadFromNBT(registries, backup) }
                     if (deducted) {
@@ -142,6 +147,12 @@ object EditorSessions {
                     }
                     TrainersWorkshop.LOGGER.error("Failed to apply survival changes to Pokemon ${pokemon.uuid}", e)
                     return EditorStatus("apply_failed", error = true)
+                }
+                // Cobblemon 1.8 gives back an empty Glass Bottle for every Ability Capsule used (AbilityChangeItem).
+                val capsules = SurvivalCosts.abilityCapsule()?.let { toDeduct[it] } ?: 0
+                if (capsules > 0) {
+                    player.inventory.offerOrDrop(ItemStack(Items.GLASS_BOTTLE, capsules))
+                    player.playerScreenHandler.sendContentUpdates()
                 }
             }
             else -> return EditorStatus("invalid_request", error = true)

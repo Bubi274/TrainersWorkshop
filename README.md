@@ -46,19 +46,29 @@ items are used.
 | Change | Cost |
 | --- | --- |
 | Raise or lower an effective IV by 1 | The matching IV candy (Cobblemon): Health, Mighty, Tough, Smart, Courage or Quick Candy to raise; Sickly, Weak, Brittle, Numb, Coward or Slow Candy to lower |
-| Set one base IV to 31 / to 0 | The matching Bottle Cap / Withered Bottle Cap (Only Bottle Caps) |
-| Set all six base IVs to 31 / to 0 | One Gold Bottle Cap / Gold Withered Bottle Cap (Only Bottle Caps) |
+| Set one IV to 31 / to 0 | The matching Bottle Cap / Withered Bottle Cap (Only Bottle Caps) |
+| Set all six IVs to 31 / to 0 | One Gold Bottle Cap / Gold Withered Bottle Cap (Only Bottle Caps) |
 | Raise an EV | A vitamin (+10) or a feather (+1) for that stat (Cobblemon) |
 | Lower an EV | An EV-reducing berry for that stat, such as Pomeg or Kelpsy (−10 each) |
 | Change nature | The mint for the new nature (Cobblemon). Works exactly like using the mint normally. |
+| Change ability | An Ability Capsule (to the other common ability) or an Ability Patch (to the hidden ability), from Cobblemon. Like in Cobblemon 1.8, each Ability Capsule gives back an empty Glass Bottle. |
 | Switch to a move the Pokémon has already learned | Free |
 | Teach a new move | The TM for that move (TMCraft). The TM is used up. |
 | Make shiny | One Shiny Berry |
 | Raise the level by 1 | One Rare Candy (Cobblemon). See below. |
 
 IVs work the same way as in Cobblemon. Candies change the **effective IV** (Cobblemon's hyper training),
-not the base IV. Bottle Caps change the **base IV**, exactly like Only Bottle Caps does. When a Pokémon
-has an effective IV, that value is used in battle. The IV tab shows how many of each item you have next
+not the base IV. Bottle Caps do exactly what Only Bottle Caps does on your server:
+
+- Only Bottle Caps 1.5 or newer with `breedingBuff = false` (the default, and the COBBLEVERSE 1.8.0
+  setting in `config/obc-common.toml`): caps change the **effective IV** with hyper training. The base
+  IV stays the same, so it isn't passed on by breeding.
+- Only Bottle Caps 1.5 or newer with `breedingBuff = true`: caps change **both** the base IV and the
+  effective IV.
+- Only Bottle Caps 1.3: caps change the **base IV** only.
+
+A cap is locked when it would change nothing (Only Bottle Caps refuses it too). A Gold cap changes every
+stat it can. When a Pokémon has an effective IV, that value is used in battle. The IV tab shows how many of each item you have next
 to its button. Buttons are locked when you don't have enough items or the IV would leave 0–31. When you
 press **Apply**, caps are used first, then candies.
 

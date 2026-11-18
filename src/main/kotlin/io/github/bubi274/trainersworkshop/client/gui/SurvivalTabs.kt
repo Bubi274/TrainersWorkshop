@@ -1,7 +1,8 @@
 package io.github.bubi274.trainersworkshop.client.gui
 
+import io.github.bubi274.trainersworkshop.editor.BottleCaps
 import io.github.bubi274.trainersworkshop.editor.EDITOR_STATS
-import io.github.bubi274.trainersworkshop.editor.NO_HYPER
+import io.github.bubi274.trainersworkshop.editor.NO_CAP
 import io.github.bubi274.trainersworkshop.editor.PokemonEditData
 import io.github.bubi274.trainersworkshop.editor.PokemonEditOptions
 import io.github.bubi274.trainersworkshop.editor.PokemonEditing
@@ -23,18 +24,20 @@ import net.minecraft.text.Text
  *
  * IVs have a base IV and an effective IV, like Cobblemon:
  * - "+"/"-": Cobblemon IV candies (Health Candy... / Sickly Candy...), ±1 effective IV (hyper training).
- * - "Max"/"0": Bottle Cap / Withered Bottle Cap (Only Bottle Caps), sets the base IV to 31 / 0.
- * A button is locked if the item is missing or the value would leave 0..31.
+ * - "Max"/"0": Bottle Cap / Withered Bottle Cap (Only Bottle Caps), sets the stat to 31 / 0. Whether that changes
+ *   the base IV, the effective IV or both depends on the server's Only Bottle Caps ([EditorScreen.bottleCapMode]).
+ * A button is locked if the item is missing, the cap would change nothing, or the value would leave 0..31.
  */
 class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     private val original get() = screen.selectedSlot!!.data
     private val options get() = screen.selectedSlot!!.options
     private val player get() = MinecraftClient.getInstance().player
+    private val capMode get() = screen.bottleCapMode
 
     /** Tries a change: the button is only enabled if it is valid and there are enough items for [field]. */
     private fun allowed(field: String, change: (PokemonEditData) -> PokemonEditData): Boolean {
         val inventory = player?.inventory ?: return false
-        val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap) { inventory.count(it) }
+        val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap, capMode) { inventory.count(it) }
         val goldProblem = field.startsWith("iv.") && "iv.gold" in result.problems
         return result.error == null && field !in result.problems && !goldProblem
     }
@@ -72,7 +75,8 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
             val effective = draft.effectiveIv(row)
             val up = SurvivalCosts.candy(stat, up = true)
             val down = SurvivalCosts.candy(stat, up = false)
-            val withoutCandy = original.hyperIvs[row].takeIf { it >= 0 } ?: draft.ivs[row]
+            // Candies start from the effective IV after the planned caps (the server uses caps first).
+            val withoutCandy = SurvivalCosts.afterCaps(original, draft, row, capMode).effective
             val haveUp = up?.let { screen.haveCount(it) } ?: 0
             val haveDown = down?.let { screen.haveCount(it) } ?: 0
             val maxEffective = minOf(SurvivalCosts.MAX_IV, withoutCandy + haveUp)
@@ -87,69 +91,67 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
                 val goal = if (Screen.hasShiftDown()) maxEffective else effective + 1
                 if (goal > effective) screen.edit { withEffective(it, row, goal) }
             }
-            baseButton(row, x + 50, y, 17, SurvivalCosts.MAX_IV, "button.max", "hint.bottle_cap", SurvivalCosts.bottleCapId(stat), gold)
-            baseButton(row, x + 68, y, 9, SurvivalCosts.MIN_IV, "button.zero", "hint.withered_cap", SurvivalCosts.witheredCapId(stat), gold)
+            capButton(row, x + 50, y, 17, SurvivalCosts.MAX_IV, "button.max", "hint.bottle_cap", SurvivalCosts.bottleCapId(stat), gold)
+            capButton(row, x + 68, y, 9, SurvivalCosts.MIN_IV, "button.zero", "hint.withered_cap", SurvivalCosts.witheredCapId(stat), gold)
         }
         val goldY = zoneY + 1
         goldButton(screen.panelX + 7, goldY, SurvivalCosts.MAX_IV, draft.useGoldCap, "button.gold_cap", SurvivalCosts.GOLD_CAP_ID, "hint.gold_cap", draft.useGoldWithered)
         goldButton(screen.panelX + 7, goldY + 10, SurvivalCosts.MIN_IV, draft.useGoldWithered, "button.gold_withered", SurvivalCosts.GOLD_WITHERED_CAP_ID, "hint.gold_withered", draft.useGoldCap)
     }
 
-    /** "Max" (Bottle Cap) or "0" (Withered Bottle Cap) button for the base IV; click again to undo. */
-    private fun baseButton(row: Int, x: Int, y: Int, w: Int, value: Int, labelKey: String, hintKey: String, itemId: String, gold: Boolean) {
-        val planned = draft.ivs[row] == value && original.ivs[row] != value
-        // Only Bottle Caps doesn't allow a cap when the base IV already has that value.
-        val active = !gold && original.ivs[row] != value && (planned || allowed("iv.$row") { withBase(it, row, value) })
+    /** "Max" (Bottle Cap) or "0" (Withered Bottle Cap) button for one stat; click again to undo. */
+    private fun capButton(row: Int, x: Int, y: Int, w: Int, value: Int, labelKey: String, hintKey: String, itemId: String, gold: Boolean) {
+        val planned = draft.caps[row] == value
+        // Only Bottle Caps refuses a cap that would change nothing.
+        val usable = BottleCaps.canUse(SurvivalCosts.ivState(original, row), value, capMode)
+        val active = !gold && usable && (planned || allowed("iv.$row") { withCap(it, row, value) })
         val label = if (planned) gui("button.undo_short") else gui(labelKey)
-        itemButton(label, x, y, w, SurvivalCosts.itemById(itemId), hintKey, active) {
-            screen.edit { withBase(it, row, if (planned) original.ivs[row] else value) }
+        itemButton(label, x, y, w, SurvivalCosts.itemById(itemId), hintKey + capMode.hintSuffix, active) {
+            screen.edit { withCap(it, row, if (planned) NO_CAP else value) }
         }
     }
 
     private fun goldButton(x: Int, y: Int, value: Int, on: Boolean, labelKey: String, itemId: String, hintKey: String, otherOn: Boolean) {
         val item = SurvivalCosts.itemById(itemId)
         val have = item?.let { screen.haveCount(it) } ?: 0
-        val active = !otherOn && original.ivs.any { it != value } && (on || allowed("iv.gold") { withGold(it, value) })
+        val usable = EDITOR_STATS.indices.any { BottleCaps.canUse(SurvivalCosts.ivState(original, it), value, capMode) }
+        val active = !otherOn && usable && (on || allowed("iv.gold") { withGold(it, value) })
         val label = if (on) gui("button.undo") else gui(labelKey, have)
-        itemButton(label, x, y, 120, item, hintKey, active) {
+        itemButton(label, x, y, 120, item, hintKey + capMode.hintSuffix, active) {
             screen.edit { if (on) withoutGold(it) else withGold(it, value) }
         }
     }
 
-    /**
-     * Writes the hyper IV the way Cobblemon stores it: a hyper IV equal to the base IV is not stored (NO_HYPER),
-     * and if no candy is needed, the old value is kept.
-     */
-    private fun resolveHyper(row: Int, base: Int, effective: Int): Int {
-        val originalHyper = original.hyperIvs[row]
-        val withoutCandy = if (originalHyper >= 0) originalHyper else base
-        return when (effective) {
-            withoutCandy -> originalHyper
-            base -> NO_HYPER
-            else -> effective
-        }
-    }
+    /** Current effective IVs of [data] with stat [row] changed to [effective]. */
+    private fun effectives(data: PokemonEditData, row: Int = -1, effective: Int = 0): List<Int> =
+        EDITOR_STATS.indices.map { if (it == row) effective else data.effectiveIv(it) }
 
+    /** Plans candies so that stat [row] ends at [effective]; the base and hyper IVs follow Cobblemon's rules. */
     private fun withEffective(data: PokemonEditData, row: Int, effective: Int): PokemonEditData =
-        data.copy(hyperIvs = data.hyperIvs.toMutableList().also { it[row] = resolveHyper(row, data.ivs[row], effective) })
+        SurvivalCosts.planIvs(original, data, effectives(data, row, effective), capMode)
 
-    /** Changes the base IV; the effective IV follows the base IV if it isn't hyper trained. */
-    private fun withBase(data: PokemonEditData, row: Int, base: Int): PokemonEditData {
-        val effective = data.hyperIvs[row].takeIf { it >= 0 } ?: base
-        val ivs = data.ivs.toMutableList().also { it[row] = base }
-        return data.copy(ivs = ivs, hyperIvs = data.hyperIvs.toMutableList().also { it[row] = resolveHyper(row, base, effective) })
+    /** Plans (or removes) the cap on stat [row]; the candies planned for that stat are dropped. */
+    private fun withCap(data: PokemonEditData, row: Int, cap: Int): PokemonEditData {
+        val capped = data.copy(caps = data.caps.toMutableList().also { it[row] = cap })
+        val afterCap = SurvivalCosts.afterCaps(original, capped, row, capMode).effective
+        return SurvivalCosts.planIvs(original, capped, effectives(capped, row, afterCap), capMode)
     }
 
+    /** Plans a gold cap; per-stat caps and planned candies are dropped. */
     private fun withGold(data: PokemonEditData, value: Int): PokemonEditData {
-        var result = data
-        EDITOR_STATS.indices.forEach { result = withBase(result, it, value) }
-        return result.copy(useGoldCap = value == SurvivalCosts.MAX_IV, useGoldWithered = value == SurvivalCosts.MIN_IV)
+        val golden = data.copy(
+            caps = List(EDITOR_STATS.size) { NO_CAP },
+            useGoldCap = value == SurvivalCosts.MAX_IV,
+            useGoldWithered = value == SurvivalCosts.MIN_IV,
+        )
+        val afterCaps = EDITOR_STATS.indices.map { SurvivalCosts.afterCaps(original, golden, it, capMode).effective }
+        return SurvivalCosts.planIvs(original, golden, afterCaps, capMode)
     }
 
+    /** Removes the gold cap; planned candies are dropped. */
     private fun withoutGold(data: PokemonEditData): PokemonEditData {
-        var result = data
-        EDITOR_STATS.indices.forEach { result = withBase(result, it, original.ivs[it]) }
-        return result.copy(useGoldCap = false, useGoldWithered = false)
+        val plain = data.copy(useGoldCap = false, useGoldWithered = false)
+        return SurvivalCosts.planIvs(original, plain, EDITOR_STATS.indices.map { original.effectiveIv(it) }, capMode)
     }
 
     // ---------- EV ----------

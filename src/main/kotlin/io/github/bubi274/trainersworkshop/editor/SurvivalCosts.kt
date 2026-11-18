@@ -156,9 +156,17 @@ object SurvivalCosts {
 
     /**
      * @param levelCap highest level allowed (see [levelLimit]).
+     * @param capMode what a Bottle Cap does with the installed Only Bottle Caps (sent by the server).
      * @param have how many of an item the player has.
      */
-    fun compute(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, levelCap: Int, have: (Item) -> Int): Result {
+    fun compute(
+        current: PokemonEditData,
+        target: PokemonEditData,
+        options: PokemonEditOptions,
+        levelCap: Int,
+        capMode: BottleCapMode,
+        have: (Item) -> Int,
+    ): Result {
         val lines = mutableListOf<Line>()
         var error: String? = null
 
@@ -168,7 +176,7 @@ object SurvivalCosts {
 
         addLevelCost(current, target, levelCap, lines)?.let { error = it }
 
-        addIvCosts(current, target, lines)?.let { error = it }
+        addIvCosts(current, target, capMode, lines)?.let { error = it }
         addEvCosts(current, target, lines, have)?.let { error = it }
         addNatureCost(current, target, lines)?.let { error = it }
         addAbilityCost(current, target, options, lines)?.let { error = it }
@@ -205,46 +213,78 @@ object SurvivalCosts {
 
     /**
      * IVs have two parts, like Cobblemon:
-     * - Base IV: a Bottle Cap raises it to 31, a Withered Bottle Cap lowers it to 0 (Only Bottle Caps calls Pokemon.setIV).
-     *   Gold / Gold Withered do all 6 stats. That mod fails if no stat would change.
-     * - Hyper-trained IV (effective IV): each candy is ±1, within 0..31.
+     * - Bottle Cap / Withered Bottle Cap (Only Bottle Caps): sets the stat to 31 / 0. What exactly changes depends on
+     *   [BottleCapMode]: the base IV (OBC 1.3), the hyper-trained IV (OBC 1.5 default), or both (OBC 1.5 breedingBuff).
+     *   Gold / Gold Withered do every stat the cap would change. OBC refuses a cap that changes nothing.
+     * - IV candies (Cobblemon): each candy hyper trains the effective IV by ±1, within 0..31.
      * The server uses the caps first and the candies after, so the candy count starts from the effective IV after the caps.
+     * The base and hyper IVs in [target] must be exactly what those steps produce ([planIvs]).
      */
-    private fun addIvCosts(current: PokemonEditData, target: PokemonEditData, lines: MutableList<Line>): String? {
+    private fun addIvCosts(current: PokemonEditData, target: PokemonEditData, capMode: BottleCapMode, lines: MutableList<Line>): String? {
         if (target.useGoldCap && target.useGoldWithered) return "survival_iv"
-        val gold = when {
-            target.useGoldCap -> MAX_IV
-            target.useGoldWithered -> MIN_IV
-            else -> null
-        }
+        val gold = goldCapValue(target)
         if (gold != null) {
-            if (target.ivs.any { it != gold } || current.ivs.all { it == gold }) return "survival_iv"
+            if (target.caps.any { it != NO_CAP }) return "survival_iv"
+            if (EDITOR_STATS.indices.none { BottleCaps.canUse(ivState(current, it), gold, capMode) }) return "survival_iv"
             val id = if (gold == MAX_IV) GOLD_CAP_ID else GOLD_WITHERED_CAP_ID
             lines += Line("iv.gold", itemById(id), 1, id)
         } else {
             EDITOR_STATS.forEachIndexed { i, stat ->
-                if (target.ivs[i] == current.ivs[i]) return@forEachIndexed
-                val id = when (target.ivs[i]) {
+                val cap = target.caps[i]
+                if (cap == NO_CAP) return@forEachIndexed
+                val id = when (cap) {
                     MAX_IV -> bottleCapId(stat)
                     MIN_IV -> witheredCapId(stat)
                     else -> return "survival_iv"
                 }
+                if (!BottleCaps.canUse(ivState(current, i), cap, capMode)) return "survival_iv"
                 lines += Line("iv.$i", itemById(id), 1, id)
             }
         }
 
         EDITOR_STATS.forEachIndexed { i, stat ->
-            val hyper = target.hyperIvs[i]
-            if (hyper == current.hyperIvs[i]) return@forEachIndexed
-            // Cobblemon removes the hyper IV when it equals the base IV (IVs.setHyperTrainedIV), so it must be stored as NO_HYPER.
-            if (hyper != NO_HYPER && (hyper !in MIN_IV..MAX_IV || hyper == target.ivs[i])) return "survival_iv"
-            val from = current.hyperIvs[i].takeIf { it >= 0 } ?: target.ivs[i]
+            val afterCaps = afterCaps(current, target, i, capMode)
             val to = target.effectiveIv(i)
-            if (from == to) return "survival_iv"
-            val up = to > from
-            lines += Line("iv.$i", candy(stat, up), kotlin.math.abs(to - from))
+            if (to !in MIN_IV..MAX_IV) return "survival_iv"
+            if (BottleCaps.withCandies(afterCaps, to) != ivState(target, i)) return "survival_iv"
+            val from = afterCaps.effective
+            if (to != from) lines += Line("iv.$i", candy(stat, to > from), kotlin.math.abs(to - from))
         }
         return null
+    }
+
+    // ---------- IV plan (Bottle Caps first, then candies) ----------
+
+    fun ivState(data: PokemonEditData, index: Int): IvState = IvState(data.ivs[index], data.hyperIvs[index])
+
+    /** 31 for a Gold Bottle Cap, 0 for a Gold Withered Bottle Cap, null if [target] uses neither. */
+    fun goldCapValue(target: PokemonEditData): Int? = when {
+        target.useGoldCap -> MAX_IV
+        target.useGoldWithered -> MIN_IV
+        else -> null
+    }
+
+    /**
+     * The cap value used on stat [index]: the stat's own cap, or the gold cap on every stat
+     * where Only Bottle Caps would change something. null if no cap is used on it.
+     */
+    fun capValue(current: PokemonEditData, target: PokemonEditData, index: Int, capMode: BottleCapMode): Int? {
+        val gold = goldCapValue(target)
+        if (gold != null) return gold.takeIf { BottleCaps.canUse(ivState(current, index), it, capMode) }
+        return target.caps[index].takeIf { it != NO_CAP }
+    }
+
+    /** IV state of stat [index] after the caps planned in [target] are used on [current]. */
+    fun afterCaps(current: PokemonEditData, target: PokemonEditData, index: Int, capMode: BottleCapMode): IvState {
+        val state = ivState(current, index)
+        val cap = capValue(current, target, index, capMode) ?: return state
+        return BottleCaps.apply(state, cap, capMode)
+    }
+
+    /** Rebuilds the base and hyper IVs of [target] from its caps and the wanted effective IVs ([effectives]). */
+    fun planIvs(current: PokemonEditData, target: PokemonEditData, effectives: List<Int>, capMode: BottleCapMode): PokemonEditData {
+        val states = EDITOR_STATS.indices.map { BottleCaps.withCandies(afterCaps(current, target, it, capMode), effectives[it]) }
+        return target.copy(ivs = states.map { it.base }, hyperIvs = states.map { it.hyper })
     }
 
     private fun addEvCosts(current: PokemonEditData, target: PokemonEditData, lines: MutableList<Line>, have: (Item) -> Int): String? {

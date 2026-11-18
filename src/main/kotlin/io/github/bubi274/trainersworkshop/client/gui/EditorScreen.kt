@@ -16,6 +16,7 @@ import com.cobblemon.mod.common.util.math.fromEulerXYZDegrees
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.client.ClientEditor
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
+import io.github.bubi274.trainersworkshop.editor.BottleCapMode
 import io.github.bubi274.trainersworkshop.editor.EditorActions
 import io.github.bubi274.trainersworkshop.editor.EditorMode
 import io.github.bubi274.trainersworkshop.editor.EditorSlot
@@ -79,6 +80,9 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         private set
 
     val mode: EditorMode get() = state.mode
+
+    /** Survival: what a Bottle Cap does on the server (Only Bottle Caps version and config). */
+    val bottleCapMode: BottleCapMode get() = state.bottleCapMode
     val selectedSlot: EditorSlot? get() = state.slot(selectedIndex)
     val left: Int get() = (width - GuiKit.BASE_WIDTH) / 2
     val top: Int get() = max(4, (height - GuiKit.TOTAL_HEIGHT) / 2)
@@ -137,7 +141,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val slot = selectedSlot ?: return null
         val data = draft ?: return null
         val player = client?.player ?: return null
-        return SurvivalCosts.compute(slot.data, data, slot.options, levelCap) { player.inventory.count(it) }
+        return SurvivalCosts.compute(slot.data, data, slot.options, levelCap, bottleCapMode) { player.inventory.count(it) }
     }
 
     fun hasProblem(field: String): Boolean = survivalCost()?.problems?.contains(field) == true
