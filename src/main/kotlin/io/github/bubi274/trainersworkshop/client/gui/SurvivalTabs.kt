@@ -144,8 +144,8 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
             useGoldCap = value == SurvivalCosts.MAX_IV,
             useGoldWithered = value == SurvivalCosts.MIN_IV,
         )
-        val afterCaps = EDITOR_STATS.indices.map { SurvivalCosts.afterCaps(original, golden, it, capMode).effective }
-        return SurvivalCosts.planIvs(original, golden, afterCaps, capMode)
+        val cappedIvs = EDITOR_STATS.indices.map { SurvivalCosts.afterCaps(original, golden, it, capMode).effective }
+        return SurvivalCosts.planIvs(original, golden, cappedIvs, capMode)
     }
 
     /** Removes the gold cap; planned candies are dropped. */

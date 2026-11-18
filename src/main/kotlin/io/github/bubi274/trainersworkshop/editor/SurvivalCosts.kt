@@ -243,11 +243,11 @@ object SurvivalCosts {
         }
 
         EDITOR_STATS.forEachIndexed { i, stat ->
-            val afterCaps = afterCaps(current, target, i, capMode)
+            val capped = afterCaps(current, target, i, capMode)
             val to = target.effectiveIv(i)
             if (to !in MIN_IV..MAX_IV) return "survival_iv"
-            if (BottleCaps.withCandies(afterCaps, to) != ivState(target, i)) return "survival_iv"
-            val from = afterCaps.effective
+            if (BottleCaps.withCandies(capped, to) != ivState(target, i)) return "survival_iv"
+            val from = capped.effective
             if (to != from) lines += Line("iv.$i", candy(stat, to > from), kotlin.math.abs(to - from))
         }
         return null
