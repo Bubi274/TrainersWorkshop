@@ -13,40 +13,40 @@ import net.minecraft.util.Identifier
 import kotlin.math.min
 
 /**
- * Tính vật phẩm cần cho PokeEditor bản survival.
- * Dùng chung cho client (hiển thị ô đỏ, khoá nút Apply) và server (kiểm tra và trừ vật phẩm),
- * nên hai bên luôn tính giống nhau.
+ * Works out the items needed by the survival PokeEditor.
+ * Shared by the client (red boxes, locked Apply button) and the server (checking and taking items),
+ * so both sides always calculate the same thing.
  */
 object SurvivalCosts {
     const val MAX_IV = 31
     const val EV_PER_VITAMIN = 10
     const val EV_PER_FEATHER = 1
     /**
-     * Berry giảm EV (Pomeg, Kelpsy...) giảm 10 mỗi quả.
-     * TODO(api): Cobblemon đọc mức giảm từ cấu hình cơ chế berry (getEvLowerAmount); ở đây cố định 10 theo yêu cầu.
+     * EV-lowering berries (Pomeg, Kelpsy...) lower EVs by 10 each.
+     * TODO(api): Cobblemon reads the amount from the berry mechanics config (evLowerAmount); here it is fixed at 10 as requested.
      */
     const val EV_PER_BERRY = 10
 
     const val RARE_CANDY_ID = "cobblemon:rare_candy"
 
-    /** Các kẹo tăng level (chỉ Rare Candy); cho tooltip và mã băm túi đồ. */
+    /** Items that raise the level (Rare Candy only); used for tooltips and the inventory hash. */
     fun levelCandies(): List<Item> = listOfNotNull(rareCandy())
 
     fun rareCandy(): Item? = itemById(RARE_CANDY_ID)
 
-    /** Level tối đa người chơi được lên: nhỏ hơn giữa level cap RCT (null = không có RCT) và level tối đa của Cobblemon. */
+    /** Highest level the player may reach: the lower of the RCT level cap (null = no RCT) and Cobblemon's max level. */
     fun levelLimit(cobblemonMax: Int, rctCap: Int?): Int = if (rctCap == null) cobblemonMax else minOf(cobblemonMax, rctCap)
 
-    /** Một dòng chi phí, gắn với phần đang chỉnh (để tô đỏ đúng chỗ). */
+    /** One cost line, linked to the part being edited (so the right spot turns red). */
     data class Line(val field: String, val item: Item?, val count: Int, val missingItemId: String? = null)
 
     data class Result(
         val lines: List<Line>,
-        /** Tổng số cần cho mỗi vật phẩm. */
+        /** Total needed of each item. */
         val needed: Map<Item, Int>,
-        /** Các phần đang chỉnh bị thiếu vật phẩm hoặc không hợp lệ (ví dụ "iv.0", "move.2", "nature"). */
+        /** Edited parts with missing items or invalid values (for example "iv.0", "move.2", "nature"). */
         val problems: Set<String>,
-        /** Khoá lỗi chặn hẳn việc Apply (thay đổi không được phép ở survival). */
+        /** Error key that blocks Apply completely (a change that isn't allowed in survival). */
         val error: String?,
     ) {
         val ok: Boolean get() = error == null && problems.isEmpty()
@@ -62,20 +62,20 @@ object SurvivalCosts {
         Stats.SPEED to "speed",
     )
 
-    // Danh sách vật phẩm lấy từ registry (lần đầu dùng), nên tự nhận vitamin/feather/berry/mint của Cobblemon.
+    // Item lists read from the registry (on first use), so Cobblemon's vitamins/feathers/berries/mints are found automatically.
     private val vitamins by lazy { evItems(EV_PER_VITAMIN) }
     private val feathers by lazy { evItems(EV_PER_FEATHER) }
     private val evBerries: Map<Stat, Item> by lazy {
         Registries.ITEM.filterIsInstance<FriendshipRaisingBerryItem>().associateBy { it.stat }
     }
     /**
-     * 12 kẹo IV của Cobblemon (Health/Mighty/... Candy tăng, Sickly/Weak/... Candy giảm).
-     * Trong Cobblemon chúng là HyperTrainingItem với ivIncreaseAmount = +1 hoặc -1 và một chỉ số.
+     * Cobblemon's 12 IV candies (Health/Mighty/... Candy raise, Sickly/Weak/... Candy lower).
+     * In Cobblemon they are HyperTrainingItems with ivIncreaseAmount = +1 or -1 and one stat.
      */
     private val candiesUp: Map<Stat, Item> by lazy { candies(1) }
     private val candiesDown: Map<Stat, Item> by lazy { candies(-1) }
 
-    // TODO(build): kiểm tra trong game là đủ 12 kẹo (Cobblemon 1.7.3 tạo chúng bằng hyperTrainingItem(id, ±1, setOf(stat), 0..31)).
+    // TODO(build): check in game that all 12 candies are found (Cobblemon 1.8.4 still creates them with hyperTrainingItem(id, ±1, setOf(stat), 0..31)).
     private fun candies(amount: Int): Map<Stat, Item> =
         Registries.ITEM.filterIsInstance<HyperTrainingItem>()
             .filter { it.ivIncreaseAmount == amount && it.targetStats.size == 1 }
@@ -100,7 +100,7 @@ object SurvivalCosts {
     fun feather(stat: Stat): Item? = feathers[stat]
     fun evBerry(stat: Stat): Item? = evBerries[stat]
 
-    // ID vật phẩm của Only Bottle Caps (đối chiếu trong jar obc 1.3.0).
+    // Only Bottle Caps item IDs (checked in the obc 1.3.0 and 1.5.0 jars).
     fun bottleCapId(stat: Stat): String = "obc:bottle_cap_${CAP_SUFFIX[stat]}"
     fun witheredCapId(stat: Stat): String = "obc:bottle_cap_${CAP_SUFFIX[stat]}_withered"
     const val GOLD_CAP_ID = "obc:bottle_cap_gold"
@@ -112,7 +112,7 @@ object SurvivalCosts {
     fun abilityCapsule(): Item? = itemById(ABILITY_CAPSULE_ID)
     fun abilityPatch(): Item? = itemById(ABILITY_PATCH_ID)
 
-    /** Danh sách ability hợp lệ có thể chọn ở chế độ Survival (bắt đầu bằng ability hiện tại). */
+    /** Valid abilities that can be picked in Survival mode (starting with the current ability). */
     fun survivalAbilities(current: PokemonEditData, options: PokemonEditOptions): List<String> {
         if (current.abilityForced || current.ability !in options.commonAbilities) {
             return listOf(current.ability)
@@ -127,7 +127,7 @@ object SurvivalCosts {
     }
 
     /**
-     * Tính mã băm (hash) số lượng các vật phẩm liên quan trong túi đồ để phát hiện thay đổi.
+     * Works out a hash of the counts of the related items in the inventory, to notice changes.
      */
     fun inventoryHash(options: PokemonEditOptions?, have: (Item) -> Int): Int {
         var h = 1
@@ -155,14 +155,14 @@ object SurvivalCosts {
     }
 
     /**
-     * @param levelCap level tối đa được lên (xem [levelLimit]).
-     * @param have số lượng vật phẩm người chơi đang có.
+     * @param levelCap highest level allowed (see [levelLimit]).
+     * @param have how many of an item the player has.
      */
     fun compute(current: PokemonEditData, target: PokemonEditData, options: PokemonEditOptions, levelCap: Int, have: (Item) -> Int): Result {
         val lines = mutableListOf<Line>()
         var error: String? = null
 
-        // Những phần survival không được đổi.
+        // Parts that survival can't change.
         if (target.uuid != current.uuid || target.species != current.species) error = "pokemon_changed"
         if (target.gender != current.gender || target.ball != current.ball || target.nature != current.nature) error = "survival_locked"
 
@@ -182,15 +182,15 @@ object SurvivalCosts {
 
         val problems = mutableSetOf<String>()
         lines.filter { it.item == null }.forEach { problems += it.field }
-        // Thiếu vật phẩm: đánh dấu mọi phần dùng vật phẩm đó (luôn kiểm tra, kể cả khi ở Creative).
+        // Missing items: mark every part that uses that item (always checked, even in Creative).
         val short = needed.filter { (item, count) -> have(item) < count }.keys
         lines.filter { it.item in short }.forEach { problems += it.field }
         return Result(lines, needed, problems, error)
     }
 
     /**
-     * Level chỉ được tăng, tối đa [levelCap]; mỗi level tốn 1 Rare Candy ([LevelRules]).
-     * Trả về khoá lỗi "level_decrease" hoặc "level_over_cap"; thiếu kẹo được báo qua dòng chi phí (tô đỏ như các mục khác).
+     * The level can only go up, at most to [levelCap]; each level costs 1 Rare Candy ([LevelRules]).
+     * Returns the error key "level_decrease" or "level_over_cap"; missing candies are reported through the cost line (red like the other parts).
      */
     private fun addLevelCost(current: PokemonEditData, target: PokemonEditData, levelCap: Int, lines: MutableList<Line>): String? {
         LevelRules.error(current.level, target.level, levelCap)?.let { return it }
@@ -199,16 +199,16 @@ object SurvivalCosts {
         return null
     }
 
-    /** Level cao nhất đạt được: min(level cap, level hiện tại + số Rare Candy đang có). */
+    /** Highest level reachable: min(level cap, current level + Rare Candies owned). */
     fun maxAffordableLevel(current: PokemonEditData, levelCap: Int, have: (Item) -> Int): Int =
         LevelRules.maxLevel(current.level, levelCap, rareCandy()?.let(have) ?: 0)
 
     /**
-     * IV có hai phần, giống Cobblemon:
-     * - IV gốc: Bottle Cap đưa lên 31, Withered Bottle Cap đưa về 0 (Only Bottle Caps gọi Pokemon.setIV).
-     *   Gold / Gold Withered làm cả 6 chỉ số. Mod đó báo lỗi nếu không có chỉ số nào thay đổi.
-     * - IV hyper train (IV có hiệu lực): mỗi kẹo ±1, trong khoảng 0..31.
-     * Server áp dụng nắp trước rồi mới tới kẹo, nên số kẹo tính từ IV có hiệu lực sau khi dùng nắp.
+     * IVs have two parts, like Cobblemon:
+     * - Base IV: a Bottle Cap raises it to 31, a Withered Bottle Cap lowers it to 0 (Only Bottle Caps calls Pokemon.setIV).
+     *   Gold / Gold Withered do all 6 stats. That mod fails if no stat would change.
+     * - Hyper-trained IV (effective IV): each candy is ±1, within 0..31.
+     * The server uses the caps first and the candies after, so the candy count starts from the effective IV after the caps.
      */
     private fun addIvCosts(current: PokemonEditData, target: PokemonEditData, lines: MutableList<Line>): String? {
         if (target.useGoldCap && target.useGoldWithered) return "survival_iv"
@@ -236,7 +236,7 @@ object SurvivalCosts {
         EDITOR_STATS.forEachIndexed { i, stat ->
             val hyper = target.hyperIvs[i]
             if (hyper == current.hyperIvs[i]) return@forEachIndexed
-            // Hyper bằng IV gốc thì Cobblemon xoá hyper (IVs.setHyperTrainedIV), nên phải ghi là NO_HYPER.
+            // Cobblemon removes the hyper IV when it equals the base IV (IVs.setHyperTrainedIV), so it must be stored as NO_HYPER.
             if (hyper != NO_HYPER && (hyper !in MIN_IV..MAX_IV || hyper == target.ivs[i])) return "survival_iv"
             val from = current.hyperIvs[i].takeIf { it >= 0 } ?: target.ivs[i]
             val to = target.effectiveIv(i)
@@ -255,7 +255,7 @@ object SurvivalCosts {
                 diff > 0 -> {
                     val vitamin = vitamins[stat]
                     val feather = feathers[stat]
-                    // Ưu tiên vitamin (+10); phần lẻ và phần thiếu vitamin bù bằng feather (+1).
+                    // Vitamins (+10) first; the remainder and any missing vitamins are made up with feathers (+1).
                     var useVitamins = diff / EV_PER_VITAMIN
                     var useFeathers = diff % EV_PER_VITAMIN
                     if (vitamin != null) {
@@ -271,7 +271,7 @@ object SurvivalCosts {
                 }
                 diff < 0 -> {
                     val decrease = -diff
-                    // Mỗi berry giảm đúng 10 (không xuống dưới 0).
+                    // Each berry lowers by exactly 10 (not below 0).
                     if (decrease % EV_PER_BERRY != 0 && target.evs[i] != 0) return "survival_ev_step"
                     val berries = (decrease + EV_PER_BERRY - 1) / EV_PER_BERRY
                     lines += Line("ev.$i", evBerries[stat], berries)

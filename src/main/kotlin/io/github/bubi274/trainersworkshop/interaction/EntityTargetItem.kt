@@ -6,8 +6,8 @@ import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.util.ActionResult
 
 /**
- * Item dùng bằng cách chuột phải vào một loại entity bất kỳ (ví dụ trainer của RCT).
- * [canTarget] chạy ở cả hai phía; [useOnEntity] luôn chạy ở phía server.
+ * An item used by right-clicking any kind of entity (for example an RCT trainer).
+ * [canTarget] runs on both sides; [useOnEntity] always runs on the server.
  */
 interface EntityTargetItem {
     fun canTarget(entity: Entity): Boolean

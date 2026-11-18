@@ -5,9 +5,9 @@ import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Files
 
-/** Các giá trị chỉnh được trong config/trainers_workshop.json. */
+/** Values that can be changed in config/trainers_workshop.json. */
 data class WorkshopConfigData(
-    /** Tỉ lệ rơi Shiny Berry từ raid 7 sao (0.05 = 5%). */
+    /** Shiny Berry drop chance from 7-star raids (0.05 = 5%). */
     var raidTierSevenShinyBerryChance: Double = 0.05,
 )
 
@@ -18,7 +18,7 @@ object WorkshopConfig {
     var data = WorkshopConfigData()
         private set
 
-    /** Đọc file config; nếu chưa có hoặc bị lỗi thì dùng giá trị mặc định và ghi lại file. */
+    /** Reads the config file; if it is missing or broken, uses the defaults and writes the file again. */
     fun load() {
         data = try {
             if (Files.exists(path)) {

@@ -7,21 +7,21 @@ import net.minecraft.client.gui.widget.ClickableWidget
 import net.minecraft.text.Text
 
 /**
- * Nút kiểu Cobblemon: dùng texture summary_evolve_button (54x30: trên = thường, dưới = rê chuột / đang chọn),
- * cắt 9 mảnh để co giãn theo mọi kích thước. Vẽ lại vì SummaryButton của Cobblemon chỉ vẽ ở cỡ cố định.
+ * A Cobblemon-style button: uses the summary_evolve_button texture (54x30: top = normal, bottom = hovered / selected),
+ * cut into 9 slices so it stretches to any size. Drawn by hand because Cobblemon's SummaryButton only draws at a fixed size.
  */
 class CobbleButton(
     x: Int, y: Int, w: Int, h: Int,
     private val label: Text,
     private val onPress: () -> Unit,
 ) : ClickableWidget(x, y, w, h, label) {
-    /** Nút đang được chọn (ví dụ trang IV / EV hiện tại): vẽ khung nhấn. */
+    /** The button is selected (for example the current IV / EV page): draws the pressed frame. */
     var selected = false
-    /** Màu chữ riêng (ví dụ đỏ khi thiếu vật phẩm); null = tự động theo trạng thái. */
+    /** Custom label color (for example red when an item is missing); null = automatic, based on the state. */
     var labelColor: Int? = null
-    /** Vẽ icon 8x8 ở bên trái nhãn (toạ độ góc trên trái của icon). */
+    /** Draws an 8x8 icon to the left of the label (top-left corner coordinates of the icon). */
     var icon: ((DrawContext, Int, Int) -> Unit)? = null
-    /** Tooltip của nút; được EditorScreen gom và vẽ ở cuối hàm render() để nằm đè lên mọi model/chữ. */
+    /** The button's tooltip; EditorScreen collects it and draws it at the end of render() so it sits on top of every model/text. */
     var tooltipText: Text? = null
 
     override fun renderWidget(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
@@ -36,7 +36,7 @@ class CobbleButton(
             !active -> 0x9A9A9A
             else -> GuiKit.WHITE
         }
-        // Nút cao từ 11 px: chữ chính scale 1.0 như Summary; nút thấp hơn: scale 0.75 cho vừa chiều cao.
+        // Buttons 11 px or taller: main text at scale 1.0 like Summary; shorter buttons: scale 0.75 to fit the height.
         val base = if (height >= 11) GuiKit.TEXT else GuiKit.MEDIUM
         val room = (width - (if (width <= 12) 2 else 4) - iconSpace).toFloat()
         val fitted = GuiKit.fit(font, label, room, scale = base, minScale = base * 0.75f)

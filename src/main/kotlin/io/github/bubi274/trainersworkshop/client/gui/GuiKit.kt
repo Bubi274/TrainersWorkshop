@@ -18,11 +18,11 @@ import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 
 /**
- * Màu, texture và hàm vẽ dùng chung, theo màn hình Summary của Cobblemon 1.7.3.
+ * Shared colors, textures and drawing helpers, based on the Cobblemon Summary screen (checked against 1.7.3 and 1.8.4).
  *
- * Dùng lại của Cobblemon: texture trong textures/gui/summary, font CobblemonResources.DEFAULT_LARGE
- * (chữ đậm vẽ ở tỉ lệ 0.5 như Summary), các icon TypeIcon / MoveCategoryIcon, SummaryTab.
- * Vẽ lại: nút (cắt 9 mảnh từ summary_evolve_button), ô party, khung phụ ở chân màn hình.
+ * Reused from Cobblemon: textures in textures/gui/summary, the CobblemonResources.DEFAULT_LARGE font
+ * (bold text drawn at scale 0.5 like Summary), the TypeIcon / MoveCategoryIcon icons, SummaryTab.
+ * Drawn by hand: buttons (9-sliced from summary_evolve_button), party slots, the extra strip under the screen.
  */
 object GuiKit {
     const val WHITE = 0xFFFFFF
@@ -31,7 +31,7 @@ object GuiKit {
     const val RED = 0xFF5555
     const val GREEN = 0x55FF55
     const val GOLD = 0xFFAA00
-    /** Màu chỉ số tăng / giảm theo nature (đỏ / xanh). */
+    /** Colors for stats raised / lowered by the nature (red / blue). */
     const val STAT_UP = 0xFF6B6B
     const val STAT_DOWN = 0x6BB5FF
     const val MALE = 0x32CAFF
@@ -39,7 +39,7 @@ object GuiKit {
     const val CREATIVE_TAG = 0xC77DFF
     const val SURVIVAL_TAG = 0x55FF55
 
-    /** Bảng xám của Cobblemon (đo từ summary_info_base.png). */
+    /** Cobblemon's gray panel (measured from summary_info_base.png). */
     const val DARK = 0xFF2F2F2F.toInt()
     const val LIGHT = 0xFF4B4B4B.toInt()
     const val FRAME = 0xFF676767.toInt()
@@ -50,11 +50,11 @@ object GuiKit {
 
     const val BASE_WIDTH = 331
     const val BASE_HEIGHT = 161
-    /** Dải phụ vẽ dưới khung Summary: danh sách vật phẩm (Cost) và thông báo. */
+    /** Extra strip drawn under the Summary frame: item list (Cost) and messages. */
     const val FOOTER_HEIGHT = 38
     const val TOTAL_HEIGHT = BASE_HEIGHT + FOOTER_HEIGHT
 
-    /** Panel giữa của Summary (InfoWidget / MovesWidget / StatWidget đều đặt ở (77, 12), cỡ 134x148). */
+    /** Middle panel of Summary (InfoWidget / MovesWidget / StatWidget all sit at (77, 12), size 134x148). */
     const val PANEL_X = 77
     const val PANEL_Y = 12
     const val PANEL_W = 134
@@ -67,8 +67,8 @@ object GuiKit {
     const val PARTY_SLOT_H = 27
 
     /**
-     * Hai tầng chữ như Summary: chữ chính dùng font DEFAULT_LARGE đậm ở scale 1.0
-     * (drawScaledText của Cobblemon để mặc định scale = 1), chữ phụ dùng font vanilla ở scale 0.5.
+     * Two text levels like Summary: main text uses the bold DEFAULT_LARGE font at scale 1.0
+     * (Cobblemon's drawScaledText with the default scale = 1), small text uses the vanilla font at scale 0.5.
      */
     const val TEXT = 1.0f
     const val MEDIUM = 0.75f
@@ -96,22 +96,22 @@ object GuiKit {
     val TAB_STATS = cobblemon("summary/summary_tab_icon_stats.png")
     val TAB_MOVES = cobblemon("summary/summary_tab_icon_moves.png")
     val TAB_INFO = cobblemon("summary/summary_tab_icon_info.png")
-    /** Icon tab tự vẽ 17x17 cùng phong cách (Cobblemon không có sẵn). */
+    /** Hand-drawn 17x17 tab icon in the same style (Cobblemon has none for this). */
     val TAB_NATURE = own("tab_icon_nature.png")
     val TAB_OTHER = own("tab_icon_other.png")
 
-    // ---------- Chữ ----------
+    // ---------- Text ----------
 
     private fun styled(s: String, bold: Boolean, small: Boolean): MutableText =
         if (small) Text.literal(s) else Text.literal(s).setStyle(Style.EMPTY.withFont(CobblemonResources.DEFAULT_LARGE).withBold(bold))
 
-    /** Chữ đã vừa khung: nội dung, tỉ lệ vẽ và bề rộng (px màn hình). */
+    /** Text that fits its box: content, draw scale and width (screen px). */
     class Fitted(val text: Text, val scale: Float, val width: Float)
 
     /**
-     * Làm chữ vừa [maxWidth] px: thu nhỏ dần tới [minScale] rồi mới cắt bằng "…".
-     * Đo bằng đúng font và độ đậm sẽ vẽ nên không bao giờ tràn.
-     * [small] = chữ phụ (font vanilla, scale 0.5); mặc định là chữ chính (DEFAULT_LARGE đậm, scale 1.0).
+     * Fits text into [maxWidth] px: shrinks it down to [minScale] first, then cuts it with "…".
+     * Measured with the exact font and boldness that will be drawn, so it never overflows.
+     * [small] = small text (vanilla font, scale 0.5); the default is main text (bold DEFAULT_LARGE, scale 1.0).
      */
     fun fit(
         font: TextRenderer, raw: Text, maxWidth: Float, scale: Float = Float.NaN, bold: Boolean = true,
@@ -148,7 +148,7 @@ object GuiKit {
         matrices.pop()
     }
 
-    /** Chữ căn trái; không vượt [maxWidth]. Trả về bề rộng đã vẽ. */
+    /** Left-aligned text; never wider than [maxWidth]. Returns the drawn width. */
     fun text(
         ctx: DrawContext, font: TextRenderer, text: Text, x: Number, y: Number, color: Int = WHITE,
         scale: Float = Float.NaN, maxWidth: Int = Int.MAX_VALUE, bold: Boolean = true, shadow: Boolean = true,
@@ -180,7 +180,7 @@ object GuiKit {
     fun textWidth(font: TextRenderer, text: Text, scale: Float = TEXT, bold: Boolean = true, small: Boolean = false): Float =
         font.getWidth(styled(text.string, bold, small)) * scale
 
-    /** Chữ phụ nhiều dòng trong [maxWidth] px, tối đa [maxLines] dòng (font vanilla, scale 0.5). Trả về số dòng đã vẽ. */
+    /** Multi-line small text within [maxWidth] px, at most [maxLines] lines (vanilla font, scale 0.5). Returns the number of lines drawn. */
     fun textWrapped(
         ctx: DrawContext, font: TextRenderer, text: Text, x: Int, y: Int, maxWidth: Int, maxLines: Int,
         color: Int = GRAY, scale: Float = SMALL, lineHeight: Int = 6,
@@ -197,16 +197,16 @@ object GuiKit {
         return minOf(lines.size, maxLines)
     }
 
-    // ---------- Khung, thanh, ô ----------
+    // ---------- Frames, bars, boxes ----------
 
-    /** Khung nổi của Cobblemon (viền sáng, thân xám, lõi tối) cho các vùng không có texture riêng. */
+    /** Cobblemon's raised frame (light border, gray body, dark core) for areas without their own texture. */
     fun panel(ctx: DrawContext, x: Int, y: Int, w: Int, h: Int) {
         ctx.fill(x, y, x + w, y + h, EDGE)
         ctx.fill(x + 1, y + 1, x + w - 1, y + h - 1, FRAME)
         ctx.fill(x + 4, y + 4, x + w - 4, y + h - 4, LIGHT)
     }
 
-    /** Ô lõm tối (ô nhãn, thanh nền). */
+    /** Dark sunken box (label box, background bar). */
     fun inset(ctx: DrawContext, x: Int, y: Int, w: Int, h: Int, fill: Int = DARK) {
         ctx.fill(x, y, x + w, y + h, fill)
     }
@@ -218,7 +218,7 @@ object GuiKit {
         ctx.fill(x, y, x + filled, y + h, 0xFF000000.toInt() or color)
     }
 
-    /** Vẽ một hình chữ nhật của texture, kéo giãn kiểu 9 mảnh (viền [cap] px giữ nguyên). */
+    /** Draws a rectangle of a texture, 9-slice stretched (the [cap] px border stays the same). */
     fun nineSlice(ctx: DrawContext, tex: Identifier, x: Int, y: Int, w: Int, h: Int, v: Int, texW: Int, texH: Int, frameW: Int, frameH: Int, cap: Int) {
         val cx = minOf(cap, w / 2)
         val cy = minOf(cap, h / 2)
@@ -239,8 +239,8 @@ object GuiKit {
         }
     }
 
-    // TODO(ui): giả định summary_move.png (108x44) gồm 2 ô 108x22 (thường / khi rê chuột); đã khớp kích thước, cần xem trong game.
-    /** Ô chiêu của Cobblemon, tô màu theo hệ (đúng cách MoveSlotWidget làm), phủ summary_move_overlay lên trên. */
+    // TODO(ui): assumes summary_move.png (108x44) holds 2 tiles of 108x22 (normal / hovered); the size matches, still needs an in-game check.
+    /** Cobblemon's move slot, tinted by type (the same way MoveSlotWidget does it), with summary_move_overlay on top. */
     fun moveSlot(ctx: DrawContext, x: Int, y: Int, hue: Int, hovered: Boolean) {
         val r = ((hue shr 16) and 0xFF) / 255f
         val g = ((hue shr 8) and 0xFF) / 255f
@@ -253,7 +253,7 @@ object GuiKit {
 
     private val itemCache = HashMap<String, ItemStack>()
 
-    /** Vẽ icon vật phẩm (ví dụ Poké Ball) thu nhỏ về [size] px. */
+    /** Draws an item icon (for example a Poké Ball) scaled down to [size] px. */
     fun itemIcon(ctx: DrawContext, id: String, x: Int, y: Int, size: Int = 8) {
         val stack = itemCache.getOrPut(id) {
             val parsed = Identifier.tryParse(id)
@@ -270,7 +270,7 @@ object GuiKit {
         matrices.pop()
     }
 
-    // ---------- Dữ liệu ----------
+    // ---------- Data ----------
 
     fun moveName(name: String): Text = Moves.getByName(name)?.displayName ?: Text.literal(name)
 
@@ -281,7 +281,7 @@ object GuiKit {
         return Text.translatable(nature.displayName)
     }
 
-    /** Chỉ số tăng / giảm của nature; null nếu trung tính. */
+    /** Stats raised / lowered by the nature; null if neutral. */
     fun natureStats(id: String): Pair<Stat, Stat>? {
         val nature = Natures.getNature(Identifier.of(id)) ?: return null
         val up = nature.increasedStat ?: return null
@@ -290,7 +290,7 @@ object GuiKit {
         return Pair(up, down)
     }
 
-    /** Ví dụ "+Atk -SpA", rỗng với nature trung tính. */
+    /** For example "+Atk -SpA", empty for a neutral nature. */
     fun natureEffect(id: String): String {
         val (up, down) = natureStats(id) ?: return ""
         return "+${shortStat(up)} -${shortStat(down)}"
@@ -321,15 +321,15 @@ object GuiKit {
         return Text.translatable("item.${parsed.namespace}.${parsed.path}")
     }
 
-    /** Texture bóng ở góc ô party: "textures/gui/ball/<tên bóng>.png" (cỡ 18x44, vẽ nửa trên 18x22). */
+    /** Ball texture in the corner of a party slot: "textures/gui/ball/<ball name>.png" (18x44, the top 18x22 half is drawn). */
     fun ballGuiTexture(id: String): Identifier {
         val parsed = Identifier.tryParse(id) ?: Identifier.of("cobblemon", "poke_ball")
         return Identifier.of(parsed.namespace, "textures/gui/ball/${parsed.path}.png")
     }
 
     /**
-     * Định dạng tooltip chuẩn vanilla (font mặc định, scale 1, tự xuống dòng ở 170 px):
-     * dòng đầu màu trắng (tên vật phẩm hoặc hành động), các dòng sau màu xám (ví dụ "Have: 15").
+     * Standard vanilla tooltip format (default font, scale 1, wraps at 170 px):
+     * the first line is white (item or action name), the following lines are gray (for example "Have: 15").
      */
     fun wrapTooltip(font: TextRenderer, raw: Text, maxWidth: Int = 170): List<OrderedText> {
         val s = raw.string.trim()

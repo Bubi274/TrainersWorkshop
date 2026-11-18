@@ -26,17 +26,17 @@ internal const val MAX_EV_TOTAL = 510
 
 fun gui(key: String, vararg args: Any): Text = Text.translatable("gui.$MOD.$key", *args)
 
-/** Một tab ở panel giữa. Các nút được tạo lại mỗi khi bản nháp thay đổi (xem EditorScreen.rebuild). */
+/** A tab in the middle panel. Its buttons are rebuilt every time the draft changes (see EditorScreen.rebuild). */
 abstract class EditorTab(protected val screen: EditorScreen) {
     abstract val title: Text
-    /** Icon 17x17 của tab (SummaryTab vẽ ở cỡ 0.5, kèm tooltip là [title]). */
+    /** 17x17 tab icon (SummaryTab draws it at 0.5 size, with [title] as the tooltip). */
     open val icon: Identifier = GuiKit.TAB_INFO
-    /** Tab chỉ hiện khi có Pokémon đang chọn (tab đồ rơi thì không cần). */
+    /** The tab only shows when a Pokémon is selected (the loot tab doesn't need one). */
     open val needsPokemon = true
     open fun init() {}
-    /** Thoát khỏi danh sách chọn đang mở (khi đổi tab hoặc đổi Pokémon). */
+    /** Closes the open picker list (when switching tabs or Pokémon). */
     open fun reset() {}
-    /** Nền panel giữa, vẽ trước các nút. */
+    /** Middle panel background, drawn before the buttons. */
     open fun renderBackdrop(context: DrawContext) {
         GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
     }
@@ -57,7 +57,7 @@ abstract class EditorTab(protected val screen: EditorScreen) {
     }
 }
 
-/** Danh sách cuộn đơn giản: mỗi hàng cao [rowHeight], cuộn bằng con lăn chuột. */
+/** Simple scrolling list: every row is [rowHeight] tall, scrolled with the mouse wheel. */
 class RowList(val rows: Int, val rowHeight: Int = 11) {
     var scroll = 0
         private set
@@ -80,7 +80,7 @@ class RowList(val rows: Int, val rowHeight: Int = 11) {
         return scroll until min(size, scroll + rows)
     }
 
-    /** Hàng (chỉ số trong danh sách) dưới chuột, hoặc -1. */
+    /** Row (index in the list) under the mouse, or -1. */
     fun hit(mouseX: Double, mouseY: Double, x: Int, y: Int, width: Int, size: Int): Int {
         if (!GuiKit.inside(mouseX, mouseY, x, y, width, rows * rowHeight)) return -1
         val index = scroll + ((mouseY - y) / rowHeight).toInt()
@@ -98,15 +98,15 @@ class RowList(val rows: Int, val rowHeight: Int = 11) {
 }
 
 /**
- * Nền chung của các tab dạng "ô nhãn tối + ô giá trị sáng" (summary_info_base.png, 134x148):
- * 6 hàng cao 11 px, cách nhau 15 px, bắt đầu ở y=5; ô nhãn x=5..49, ô giá trị x=50..128.
+ * Shared background of tabs made of "dark label box + light value box" (summary_info_base.png, 134x148):
+ * 6 rows of 11 px, 15 px apart, starting at y=5; label box x=5..49, value box x=50..128.
  */
 abstract class InfoRowsTab(screen: EditorScreen) : EditorTab(screen) {
     protected fun rowY(row: Int) = screen.panelY + 5 + row * 15
     protected val labelX get() = screen.panelX + 5
     protected val cellX get() = screen.panelX + 50
     protected val cellW = 79
-    /** Vùng sáng phía dưới 6 hàng (y=91..112): nút phụ, tổng EV, ghi chú. */
+    /** Light area under the 6 rows (y=91..112): extra buttons, EV total, notes. */
     protected val zoneY get() = screen.panelY + 91
 
     override fun renderBackdrop(context: DrawContext) = drawTexturePanel(context, GuiKit.INFO_BASE)
@@ -116,7 +116,7 @@ abstract class InfoRowsTab(screen: EditorScreen) : EditorTab(screen) {
     }
 }
 
-/** IV và EV của 6 chỉ số, giống tab Stats của Summary: 6 hàng + thanh chọn trang "IVs | EVs" ở dưới cùng. */
+/** IVs and EVs of the 6 stats, like the Summary Stats tab: 6 rows + an "IVs | EVs" page switch at the bottom. */
 abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
     override val title: Text = gui("tab.stats")
     override val icon: Identifier = GuiKit.TAB_STATS
@@ -129,7 +129,7 @@ abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
         screen.button(gui("button.view_ev"), screen.panelX + 70, y, 59, 20) { showEvs = true; screen.rebuild() }.selected = showEvs
     }
 
-    /** Đỏ nếu nature làm tăng chỉ số này, xanh nếu làm giảm (như Summary). */
+    /** Red if the nature raises this stat, blue if it lowers it (like Summary). */
     protected fun statColor(row: Int): Int {
         val (up, down) = GuiKit.natureStats(draft.effectiveNature) ?: return GuiKit.WHITE
         return when (EDITOR_STATS[row]) {
@@ -152,13 +152,13 @@ abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
         }
     }
 
-    /** Số ở trên, thanh giá trị mảnh ở dưới, trong vùng [x, x+w) của ô giá trị. */
+    /** Number on top, thin value bar below, inside [x, x+w) of the value box. */
     protected fun drawValue(context: DrawContext, row: Int, x: Int, w: Int, text: String, color: Int, value: Int, max: Int, barColor: Int = 0x55AA55) {
         GuiKit.textCentered(context, screen.font, Text.literal(text), x + w / 2f, rowY(row) + 1, color, maxWidth = w, minScale = GuiKit.MEDIUM)
         GuiKit.bar(context, x + 1, rowY(row) + 9, w - 2, 2, value, max, barColor)
     }
 
-    /** Thanh tổng EV "EV total: 14 / 510" ở vùng sáng dưới 6 hàng. */
+    /** "EV total: 14 / 510" bar in the light area under the 6 rows. */
     protected fun drawEvMeter(context: DrawContext, y: Int) {
         val x = screen.panelX + 7
         val total = draft.evs.sum()
@@ -170,7 +170,7 @@ abstract class StatPageTab(screen: EditorScreen) : InfoRowsTab(screen) {
     protected fun changedColor(value: Int, original: Int?) = if (original != null && value != original) GuiKit.GOLD else GuiKit.WHITE
 }
 
-/** Bản creative / Trainer Editor: bấm để ±1, giữ Shift để ±10. */
+/** Creative / Trainer Editor version: click for ±1, hold Shift for ±10. */
 open class StatsTab(screen: EditorScreen) : StatPageTab(screen) {
     override fun init() {
         initPageButtons()
@@ -221,7 +221,7 @@ open class StatsTab(screen: EditorScreen) : StatPageTab(screen) {
     }
 }
 
-/** 4 ô chiêu (kiểu MoveSlotWidget của Cobblemon); bấm vào một ô để chọn chiêu khác từ danh sách có ô tìm kiếm. */
+/** 4 move slots (like Cobblemon's MoveSlotWidget); click a slot to pick another move from a searchable list. */
 open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
     override val title: Text = gui("tab.moves")
     override val icon: Identifier = GuiKit.TAB_MOVES
@@ -236,14 +236,14 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
     private val listY get() = screen.panelY + 22
     private val listWidth = 117
 
-    /** Chiêu có thể chọn cho ô đang chọn (bỏ các chiêu đang nằm ở ô khác). */
+    /** Moves that can be picked for the selected slot (without the moves already in other slots). */
     protected open fun candidates(): List<String> {
         val options = screen.selectedSlot?.options ?: return emptyList()
         val others = draft.moves.filterIndexed { i, m -> i != pickingSlot && m.isNotEmpty() }
         return options.legalMoves.filter { it !in others }
     }
 
-    /** Danh sách sau khi lọc theo ô tìm kiếm (lọc lúc vẽ, không cần dựng lại nút). */
+    /** The list after the search filter (filtered while drawing, so the buttons don't need a rebuild). */
     private fun filtered(): List<String> {
         val query = search.trim().lowercase()
         val all = candidates()
@@ -251,16 +251,16 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
         return all.filter { GuiKit.moveName(it).string.lowercase().contains(query) || it.lowercase().contains(query) }
     }
 
-    /** Có được chọn chiêu này không (survival kiểm tra TM). */
+    /** Whether this move can be picked (survival checks the TM). */
     protected open fun isSelectable(move: String) = true
 
-    /** Nhãn phụ bên phải mỗi hàng (survival: miễn phí / TM). */
+    /** Extra label on the right of each row (survival: free / TM). */
     protected open fun rowTag(move: String): Pair<Text, Int>? = null
 
-    /** Dòng thứ 3 ở 3 ô thông tin góc trái dưới ("Free" hoặc "Needs TM (have N)"). */
+    /** Third line of the 3 info boxes in the bottom-left corner ("Free" or "Needs TM (have N)"). */
     protected open fun moveCostInfo(move: String): Pair<Text, Int> = Pair(gui("tag.free"), GuiKit.GREEN)
 
-    /** Dòng chú thích dưới danh sách chọn chiêu (survival giải thích các nhãn). */
+    /** Note line under the move picker (survival explains the labels). */
     protected open fun pickerNote(): Text? = null
 
     override fun reset() {
@@ -303,7 +303,7 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
 
     override fun renderBackdrop(context: DrawContext) {
         drawTexturePanel(context, GuiKit.MOVES_BASE)
-        // Danh sách chọn chiêu che vùng 4 ô chiêu bằng nền sáng của panel.
+        // The move picker covers the 4 move slots with the panel's light background.
         if (pickingSlot >= 0) context.fill(screen.panelX + 5, screen.panelY + 5, screen.panelX + 129, screen.panelY + 112, GuiKit.LIGHT)
     }
 
@@ -334,7 +334,7 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
             }
             val tag = rowTag(move)?.takeIf { changed }
             val tagWidth = tag?.let { GuiKit.textWidth(font, it.first, GuiKit.SMALL, small = true).toInt() + 3 } ?: 0
-            // Cùng toạ độ MoveSlotWidget: icon hệ (+2,+2), tên (+28,+2), icon loại đòn (+66,+13.5), PP (+93,+13).
+            // Same coordinates as MoveSlotWidget: type icon (+2,+2), name (+28,+2), category icon (+66,+13.5), PP (+93,+13).
             TypeIcon(x = x + 2, y = y + 2, type = template.elementalType, secondaryType = null).render(context)
             GuiKit.text(context, font, GuiKit.moveName(move), x + 28, y + 2, nameColor, maxWidth = 76 - tagWidth, minScale = GuiKit.MEDIUM)
             val power = template.power.toInt()
@@ -351,7 +351,7 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
         GuiKit.textWrapped(context, font, gui("hint.moves"), screen.panelX + 72, screen.panelY + 116, 54, 4, GuiKit.GRAY)
     }
 
-    /** Ba ô nhỏ ở góc trái dưới panel: Category, Accuracy, và "Free" / "Needs TM (have N)" của chiêu đang chọn/rê chuột. */
+    /** Three small boxes in the bottom-left corner of the panel: Category, Accuracy, and "Free" / "Needs TM (have N)" for the selected/hovered move. */
     private fun renderMoveDetails(context: DrawContext, move: String?) {
         val template = move?.let { Moves.getByName(it) } ?: return
         val accuracy = template.accuracy
@@ -426,8 +426,8 @@ open class MovesTab(screen: EditorScreen) : EditorTab(screen) {
 }
 
 /**
- * Lưới 25 nature, 2 cột x 13 hàng (không cần cuộn). Mỗi ô: tên + ▲chỉ số tăng (đỏ) / ▼chỉ số giảm (xanh).
- * Nature hiện tại của Pokémon có viền vàng, nature đang chọn có nền sáng.
+ * Grid of the 25 natures, 2 columns x 13 rows (no scrolling). Each cell: name + ▲raised stat (red) / ▼lowered stat (blue).
+ * The Pokémon's current nature has a gold border, the chosen nature has a light background.
  */
 open class NatureTab(screen: EditorScreen) : EditorTab(screen) {
     override val title: Text = gui("tab.nature")
@@ -443,12 +443,12 @@ open class NatureTab(screen: EditorScreen) : EditorTab(screen) {
     private fun cellX(index: Int) = screen.panelX + 5 + (index / rows) * (cellW + 1)
     private fun cellY(index: Int) = screen.panelY + 5 + (index % rows) * (cellH + 1)
 
-    /** Nature đang được chọn trong bản nháp. */
+    /** The nature chosen in the draft. */
     protected open fun chosen(): String = draft.effectiveNature
 
     protected open fun isSelectable(nature: String) = true
 
-    /** Dòng chi phí dưới lưới (survival: "Requires Timid Mint (have 1)"). */
+    /** Cost line under the grid (survival: "Requires Timid Mint (have 1)"). */
     protected open fun costLine(): Pair<Text, Int>? = null
 
     protected open fun choose(nature: String) = screen.edit { it.copy(nature = nature, mintedNature = "") }
@@ -498,7 +498,7 @@ open class NatureTab(screen: EditorScreen) : EditorTab(screen) {
     }
 }
 
-/** Shiny, ability, giới tính, level, loại bóng: mỗi hàng là ô nhãn tối + ô giá trị sáng. */
+/** Shiny, ability, gender, level, ball: each row is a dark label box + a light value box. */
 open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
     override val title: Text = gui("tab.other")
     override val icon: Identifier = GuiKit.TAB_OTHER
@@ -545,10 +545,10 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         }.icon = { ctx, x, y -> GuiKit.itemIcon(ctx, ball, x, y, 8) }
     }
 
-    /** Survival cho tăng level bằng kẹo (hàng Level không bị làm mờ). Bản Creative tự chỉnh level nên không dùng. */
+    /** Survival allows raising the level with candies (the Level row is not dimmed). The Creative version edits the level directly, so it doesn't use this. */
     protected open val levelEditable: Boolean get() = false
 
-    /** Các nút của hàng Level ở Survival; [x] là góc trái của ô giá trị, [y] là mép trên nút. */
+    /** Buttons of the Level row in Survival; [x] is the left edge of the value box, [y] is the top edge of the buttons. */
     protected open fun initLevel(x: Int, y: Int) {}
 
     protected open fun initShiny(x: Int, y: Int, w: Int) {
@@ -572,7 +572,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
             GuiKit.panel(context, screen.panelX, screen.panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
         } else {
             super.renderBackdrop(context)
-            // Xoá hàng thứ 6 (y=80..91) và các ô/thanh trống phía dưới (y=92..143) của summary_info_base.png vì tab Other chỉ dùng 5 hàng (0..4).
+            // Clear the 6th row (y=80..91) and the empty boxes/bars below it (y=92..143) of summary_info_base.png, because the Other tab only uses 5 rows (0..4).
             context.fill(screen.panelX + 4, screen.panelY + 77, screen.panelX + GuiKit.PANEL_W - 4, screen.panelY + GuiKit.PANEL_H - 4, GuiKit.LIGHT)
         }
     }
@@ -600,7 +600,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         renderReadOnly(context)
     }
 
-    /** Survival: giới tính và bóng chỉ hiển thị (mờ) và ghi rõ "Creative only"; level do SurvivalOtherTab vẽ. */
+    /** Survival: gender and ball are only shown (dimmed) and marked "Creative only"; SurvivalOtherTab draws the level. */
     private fun renderReadOnly(context: DrawContext) {
         val font = screen.font
         val x = cellX + 4
@@ -658,7 +658,7 @@ open class OtherTab(screen: EditorScreen) : InfoRowsTab(screen) {
         return Text.translatable(template.displayName)
     }
 
-    /** Lấy phần tử kế tiếp (Shift: phần tử trước) trong danh sách. */
+    /** Gets the next element (Shift: the previous one) in the list. */
     protected fun cycle(values: List<String>, current: String): String {
         if (values.isEmpty()) return current
         val index = values.indexOf(current)

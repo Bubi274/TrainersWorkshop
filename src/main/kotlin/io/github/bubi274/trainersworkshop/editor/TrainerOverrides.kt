@@ -11,7 +11,7 @@ import java.util.UUID
 
 enum class LootMode { EVERY_WIN, FIRST_WIN_PER_PLAYER }
 
-/** Một món đồ rơi: vật phẩm (kèm số lượng) và tỉ lệ 0..1. */
+/** One loot entry: an item (with its count) and a chance from 0 to 1. */
 data class LootEntry(val stack: ItemStack, val chance: Float) {
     fun toNbt(registries: RegistryWrapper.WrapperLookup): NbtCompound = NbtCompound().apply {
         put("item", stack.encode(registries))
@@ -29,8 +29,8 @@ data class LootEntry(val stack: ItemStack, val chance: Float) {
 }
 
 /**
- * Chỉnh sửa của một trainer RCT cụ thể (theo UUID của entity).
- * [team] null nghĩa là dùng đội gốc của RCT; Pokémon lưu dạng NBT của Cobblemon.
+ * Edits for one specific RCT trainer (by entity UUID).
+ * A null [team] means the original RCT team is used; Pokémon are stored as Cobblemon NBT.
  */
 class TrainerOverride(
     val trainerId: String,
@@ -40,7 +40,7 @@ class TrainerOverride(
     val keepDefaultLoot: Boolean,
     val claimedBy: MutableSet<UUID> = mutableSetOf(),
 ) {
-    /** Tăng mỗi lần lưu, để biết khi nào cần dựng lại đội cho trận đấu. */
+    /** Goes up on every save, so we know when the battle team must be rebuilt. */
     var version: Int = 0
 
     fun toNbt(registries: RegistryWrapper.WrapperLookup): NbtCompound = NbtCompound().apply {
@@ -64,7 +64,7 @@ class TrainerOverride(
     }
 }
 
-/** Lưu các chỉnh sửa trainer vào dữ liệu thế giới (world/data/trainers_workshop_trainers.dat). */
+/** Saves trainer edits in the world data (world/data/trainers_workshop_trainers.dat). */
 class TrainerOverrides : PersistentState() {
     private val overrides = HashMap<UUID, TrainerOverride>()
 

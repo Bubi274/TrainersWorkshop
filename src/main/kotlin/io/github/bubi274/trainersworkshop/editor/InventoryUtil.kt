@@ -5,7 +5,7 @@ import net.minecraft.item.ItemStack
 import net.minecraft.server.network.ServerPlayerEntity
 
 object InventoryUtil {
-    /** Trừ vật phẩm khỏi túi người chơi. Gọi sau khi đã kiểm tra đủ số lượng. */
+    /** Takes items from the player's inventory. Call this after checking there are enough. */
     fun take(player: ServerPlayerEntity, needed: Map<Item, Int>) {
         if (needed.isEmpty()) return
         val inventory = player.inventory
@@ -23,7 +23,7 @@ object InventoryUtil {
         inventory.markDirty()
     }
 
-    /** Hoàn trả đúng số vật phẩm đã trừ khi quá trình Apply gặp lỗi. */
+    /** Gives back exactly the items that were taken when Apply fails. */
     fun refund(player: ServerPlayerEntity, taken: Map<Item, Int>) {
         if (taken.isEmpty()) return
         val inventory = player.inventory

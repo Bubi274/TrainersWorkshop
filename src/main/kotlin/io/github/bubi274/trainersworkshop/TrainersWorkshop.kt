@@ -15,7 +15,7 @@ import net.minecraft.util.Identifier
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-/** Điểm khởi động của mod: gọi lần lượt từng phần cần đăng ký. */
+/** Entry point of the mod: calls each part that needs to register, in order. */
 object TrainersWorkshop : ModInitializer {
     const val MOD_ID = "trainers_workshop"
     val LOGGER: Logger = LoggerFactory.getLogger(MOD_ID)
@@ -32,7 +32,7 @@ object TrainersWorkshop : ModInitializer {
         RaidDensCompat.register()
         RctCompat.init()
 
-        // Trainer bị giết/xoá hẳn: bỏ luôn chỉnh sửa đã lưu của nó.
+        // The trainer was killed/removed for good: also drop its saved edits.
         ServerEntityEvents.ENTITY_UNLOAD.register { entity, world ->
             if (entity.removalReason?.shouldDestroy() == true && RctCompat.isTrainer(entity)) {
                 TrainerOverrides.get(world.server).remove(entity.uuid)

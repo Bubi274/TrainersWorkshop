@@ -14,7 +14,7 @@ import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 import java.util.UUID
 
-/** Bản nháp đang chỉnh của một trainer RCT. Chỉ ghi vào thế giới khi bấm Save. */
+/** Draft edits of one RCT trainer. Only written to the world when Save is pressed. */
 class TrainerEditorSession(
     val entityUuid: UUID,
     val trainerId: String,
@@ -147,7 +147,7 @@ object TrainerEditing {
         return EditorStatus("pokemon_removed")
     }
 
-    /** Thêm vật phẩm đang cầm ở tay chính (lấy từ túi phía server, không tin dữ liệu client). */
+    /** Adds the item held in the main hand (read from the server-side inventory, client data is not trusted). */
     private fun addHandItem(player: ServerPlayerEntity, session: TrainerEditorSession): EditorStatus {
         val hand = player.mainHandStack
         if (hand.isEmpty) return EditorStatus("hand_empty", error = true)
@@ -172,7 +172,7 @@ object TrainerEditing {
         return null
     }
 
-    /** Trainer phải còn tồn tại, cùng thế giới và ở gần người chơi. */
+    /** The trainer must still exist, be in the same world and be near the player. */
     private fun findTrainer(player: ServerPlayerEntity, session: TrainerEditorSession): Entity? {
         val entity = player.serverWorld.getEntity(session.entityUuid) ?: return null
         if (!entity.isAlive || !RctCompat.isTrainer(entity)) return null
@@ -186,7 +186,7 @@ object TrainerEditing {
         val overrides = TrainerOverrides.get(player.server)
         val previous = overrides[session.entityUuid]
         val registries = player.server.registryManager
-        // Chỉ lưu đội khi đã đổi, để trainer chưa đổi đội vẫn dùng đội gốc (giữ gimmick của RCT).
+        // Only save the team if it changed, so a trainer whose team wasn't changed keeps the original team (and RCT's gimmicks).
         val team = if (session.teamChanged || previous?.team != null) {
             session.team.map { it.saveToNBT(registries, NbtCompound()) }
         } else {

@@ -9,19 +9,19 @@ import net.minecraft.item.Item
 import net.minecraft.registry.Registries
 import net.minecraft.registry.Registry
 
-/** Danh sách item của mod. Món mới thêm vào đây. */
+/** The mod's items. Add new items here. */
 object ModItems {
     val SHINY_BERRY: Item = register("shiny_berry", ShinyBerryItem(Item.Settings()))
     val POKEEDITOR: Item = register("pokeeditor", PokeEditorItem(Item.Settings().maxCount(1), EditorMode.SURVIVAL))
     val POKEEDITOR_CREATIVE: Item = register("pokeeditor_creative", PokeEditorItem(Item.Settings().maxCount(1), EditorMode.CREATIVE))
     val TRAINER_EDITOR: Item = register("trainer_editor", TrainerEditorItem(Item.Settings().maxCount(1)))
 
-    /** Thứ tự hiển thị trong tab creative. */
+    /** Display order in the creative tab. */
     val ALL: List<Item> = listOf(SHINY_BERRY, POKEEDITOR, POKEEDITOR_CREATIVE, TRAINER_EDITOR)
 
     private fun register(name: String, item: Item): Item =
         Registry.register(Registries.ITEM, TrainersWorkshop.id(name), item)
 
-    /** Gọi để chắc chắn object này được nạp (các item đăng ký ở trên). */
+    /** Call this to make sure the object is loaded (the items above get registered). */
     fun register() = Unit
 }

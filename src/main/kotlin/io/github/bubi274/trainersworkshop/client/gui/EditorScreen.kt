@@ -42,19 +42,19 @@ import org.joml.Vector3f
 import kotlin.math.max
 
 /**
- * Màn hình chỉnh sửa dùng chung cho PokeEditor (creative/survival) và Trainer Editor.
- * Bố cục theo màn hình Summary của Cobblemon: trái = Pokémon đang chọn, giữa = các tab icon, phải = đội hình + nút.
- * Dưới khung Summary có thêm một dải phụ (Cost / thông báo / ô nhập loài của Trainer Editor).
+ * Editor screen shared by the PokeEditor (creative/survival) and the Trainer Editor.
+ * Layout follows Cobblemon's Summary screen: left = selected Pokémon, middle = icon tabs, right = party + buttons.
+ * Under the Summary frame there is an extra strip (Cost / messages / the Trainer Editor species input).
  */
 class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${TrainersWorkshop.MOD_ID}.editor")) {
     var state: EditorState = state
         private set
 
-    /** Ô đội hình đang chọn (chỉ số 0..5). */
+    /** Selected party slot (index 0..5). */
     var selectedIndex: Int = state.slots.firstOrNull()?.index ?: -1
         private set
 
-    /** Bản nháp đang chỉnh của Pokémon đang chọn; chỉ gửi lên server khi bấm Apply. */
+    /** Draft edits of the selected Pokémon; only sent to the server when Apply is pressed. */
     var draft: PokemonEditData? = state.slot(selectedIndex)?.data
         private set
 
@@ -64,7 +64,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private var modelWidget: ModelWidget? = null
     private var modelKey: String = ""
 
-    /** FloatingState cho từng ô party (giữ lại giữa các lần rebuild để animation không bị giật, giống PartySlotWidget). */
+    /** FloatingState for each party slot (kept between rebuilds so animations don't stutter, like PartySlotWidget). */
     private val slotStates = HashMap<Int, Pair<String, FloatingState>>()
     private val buttons = mutableListOf<CobbleButton>()
     private val tabWidgets = mutableListOf<Pair<SummaryTab, Text>>()
@@ -72,8 +72,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     private var lastInventoryHash: Int = 0
 
     /**
-     * Survival: level tối đa được lên = nhỏ hơn giữa level cap RCT của người chơi và level tối đa của Cobblemon.
-     * Cap RCT đọc ở client bằng PlayerState (chỉ để hiển thị và khoá nút; server luôn tính lại bằng TrainerManager).
+     * Survival: the highest level allowed = the lower of the player's RCT level cap and Cobblemon's max level.
+     * The client reads the RCT cap from PlayerState (only to show it and lock buttons; the server always recalculates it with TrainerManager).
      */
     var levelCap: Int = state.maxLevel
         private set
@@ -83,11 +83,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     val left: Int get() = (width - GuiKit.BASE_WIDTH) / 2
     val top: Int get() = max(4, (height - GuiKit.TOTAL_HEIGHT) / 2)
 
-    /** Panel giữa của Summary. */
+    /** Middle panel of Summary. */
     val panelX: Int get() = left + GuiKit.PANEL_X
     val panelY: Int get() = top + GuiKit.PANEL_Y
 
-    /** Vùng nội dung tự do của tab (trong khung panel, chừa viền 5 px). */
+    /** Free content area of a tab (inside the panel frame, with a 5 px border). */
     val contentX: Int get() = panelX + 5
     val contentY: Int get() = panelY + 5
     val contentWidth: Int = 124
@@ -103,11 +103,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         EditorMode.CREATIVE -> listOf(StatsTab(this), MovesTab(this), NatureTab(this), OtherTab(this))
     }
 
-    /** Trainer Editor: thông tin trainer và đồ rơi (giải mã một lần mỗi khi server gửi trạng thái). */
+    /** Trainer Editor: trainer info and loot (decoded once every time the server sends a state). */
     var trainer: TrainerView? = null
         private set
 
-    /** Ô nhập tên loài (Trainer Editor), giữ lại khi các nút được tạo lại. */
+    /** Species name input (Trainer Editor), kept when the buttons are rebuilt. */
     private var speciesInput = ""
 
     private fun decodeTrainer(): TrainerView? {
@@ -116,7 +116,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return TrainerView.from(nbt, registries)
     }
 
-    /** Gửi một hành động của Trainer Editor; gửi trước các chỉnh sửa Pokémon chưa lưu vào bản nháp. */
+    /** Sends a Trainer Editor action; first sends the unsaved Pokémon edits into the draft. */
     fun trainerAction(action: String, fill: NbtCompound.() -> Unit) {
         pushPendingEdit()
         ClientEditor.send(action, fill)
@@ -131,7 +131,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    /** Survival: vật phẩm cần cho bản nháp hiện tại, tính bằng túi đồ phía client (server tính lại khi Apply). */
+    /** Survival: items needed for the current draft, counted from the client inventory (the server recalculates on Apply). */
     fun survivalCost(): SurvivalCosts.Result? {
         if (mode != EditorMode.SURVIVAL) return null
         val slot = selectedSlot ?: return null
@@ -144,7 +144,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     fun haveCount(item: net.minecraft.item.Item): Int = client?.player?.inventory?.count(item) ?: 0
 
-    /** Server gửi trạng thái mới (sau Apply hoặc khi đội hình thay đổi). */
+    /** The server sent a new state (after Apply or when the party changed). */
     fun update(newState: EditorState, newStatus: NbtCompound?) {
         state = newState
         refreshLevelCap()
@@ -157,7 +157,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     fun select(index: Int) {
         if (state.slot(index) == null || index == selectedIndex) return
-        // PokeEditor: thay đổi chưa Apply của Pokémon cũ bị bỏ. Trainer Editor: đưa vào bản nháp của server.
+        // PokeEditor: unapplied changes of the previous Pokémon are discarded. Trainer Editor: they go into the server draft.
         pushPendingEdit()
         tabs.forEach { it.reset() }
         selectedIndex = index
@@ -166,7 +166,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         rebuild()
     }
 
-    /** Sửa bản nháp rồi vẽ lại các nút. */
+    /** Changes the draft, then rebuilds the buttons. */
     fun edit(change: (PokemonEditData) -> PokemonEditData) {
         val current = draft ?: return
         draft = change(current)
@@ -181,7 +181,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     fun <T : ClickableWidget> addWidget(widget: T): T = addDrawableChild(widget)
 
-    /** Đưa focus bàn phím vào một ô nhập (ví dụ ô tìm chiêu). */
+    /** Gives keyboard focus to an input box (for example the move search box). */
     fun focusWidget(widget: ClickableWidget) {
         focused = widget
     }
@@ -194,7 +194,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return addWidget(button)
     }
 
-    /** Đưa một tooltip vào hàng chờ để vẽ ở cuối hàm render() (mỗi lần render chỉ vẽ tối đa 1 tooltip). */
+    /** Queues a tooltip to draw at the end of render() (at most 1 tooltip per render). */
     fun deferTooltip(text: Text) {
         if (pendingTooltip == null) pendingTooltip = GuiKit.wrapTooltip(font, text)
     }
@@ -208,7 +208,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return SurvivalCosts.inventoryHash(selectedSlot?.options) { player.inventory.count(it) }
     }
 
-    /** Cập nhật [levelCap]; trả về true nếu giá trị thay đổi. */
+    /** Updates [levelCap]; returns true if the value changed. */
     private fun refreshLevelCap(): Boolean {
         if (mode != EditorMode.SURVIVAL) return false
         val player = client?.player
@@ -234,7 +234,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     }
 
     fun rebuild() {
-        // Chưa init (chưa biết kích thước màn hình): init() sẽ gọi lại.
+        // Not initialized yet (screen size unknown): init() will call this again.
         if (client == null) return
         lastInventoryHash = computeInventoryHash()
         clearChildren()
@@ -247,7 +247,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         updateSlotModels()
     }
 
-    /** 4 tab icon như Summary: tab đầu x=78, mỗi tab cách 31 px (nhiều tab hơn thì xếp sát lại cho vừa 132 px). */
+    /** 4 icon tabs like Summary: the first tab at x=78, 31 px apart (with more tabs they move closer to fit 132 px). */
     private fun initTabs() {
         val step = if (tabs.size <= 1) 0 else minOf(31, (132 - 39) / (tabs.size - 1))
         tabs.forEachIndexed { i, tab ->
@@ -264,7 +264,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         button(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.apply"), left + 273, y, 46, 14, active = canApply()) { apply() }
     }
 
-    /** Trainer Editor: ô nhập loài + Set/Add/Remove ở dải chân, Reset / Close / Save ở góc phải. */
+    /** Trainer Editor: species input + Set/Add/Remove in the bottom strip, Reset / Close / Save in the right corner. */
     private fun initTrainerPanel() {
         if (trainer == null) trainer = decodeTrainer()
         val footerY = top + GuiKit.BASE_HEIGHT + 6
@@ -313,7 +313,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    // ---------- Model Pokémon ----------
+    // ---------- Pokémon model ----------
 
     private fun renderable(data: PokemonEditData): RenderablePokemon? {
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species)) ?: return null
@@ -363,8 +363,8 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         val key = modelKey(data)
         val current = modelWidget
         val widget = if (key != modelKey || current == null) {
-            // Khớp Summary.init(): ModelWidget(left+6, top+32, 66, 66, pokemon, 2f, 325f, -10.0, playCryOnClick=false, shouldFollowCursor=true)
-            // và gọi setPokemon để đăng ký các hàm MoLang trên FloatingState như Summary.updatePokemonInfo().
+            // Matches Summary.init(): ModelWidget(left+6, top+32, 66, 66, pokemon, 2f, 325f, -10.0, playCryOnClick=false, shouldFollowCursor=true)
+            // and calls setPokemon to register the MoLang functions on the FloatingState like Summary.updatePokemonInfo().
             ModelWidget(
                 pX = left + 6, pY = top + 32, pWidth = 66, pHeight = 66,
                 pokemon = pokemon,
@@ -383,7 +383,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         addDrawableChild(widget)
     }
 
-    /** Cập nhật FloatingState cho từng ô party giống PartySlotWidget. */
+    /** Updates the FloatingState of each party slot like PartySlotWidget. */
     private fun updateSlotModels() {
         for (position in 0 until 6) {
             val data = slotData(position)
@@ -403,11 +403,11 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    // ---------- Vẽ ----------
+    // ---------- Drawing ----------
 
     override fun renderBackground(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         super.renderBackground(context, mouseX, mouseY, delta)
-        // Thứ tự như Summary: nền ảnh Pokémon, rồi khung chính.
+        // Same order as Summary: Pokémon portrait background, then the main frame.
         context.drawTexture(GuiKit.PORTRAIT_BACKGROUND, left + 6, top + 32, 0f, 0f, 66, 66, 66, 66)
         context.drawTexture(GuiKit.SUMMARY_BASE, left, top, 0f, 0f, GuiKit.BASE_WIDTH, GuiKit.BASE_HEIGHT, GuiKit.BASE_WIDTH, GuiKit.BASE_HEIGHT)
         if (draft != null || !activeTab.needsPokemon) activeTab.renderBackdrop(context) else GuiKit.panel(context, panelX, panelY, GuiKit.PANEL_W, GuiKit.PANEL_H)
@@ -417,7 +417,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         pendingTooltip = null
-        // Texture nền và model 3D vẽ ở renderBackground / super.render; ở đây vẽ các lớp chữ/icon và đẩy Z như Summary.render.
+        // The background texture and 3D model are drawn in renderBackground / super.render; here we draw the text/icon layers and push Z like Summary.render.
         super.render(context, mouseX, mouseY, delta)
         val matrices = context.matrices
         matrices.push()
@@ -454,7 +454,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         matrices.pop()
     }
 
-    /** Khung trái giống Summary: tab "Lv.xx", dòng tên (bóng + tên + giới tính), dấu shiny, ô Held Item, icon hệ. */
+    /** Left frame like Summary: "Lv.xx" tab, name line (ball + name + gender), shiny mark, Held Item box, type icons. */
     private fun renderLeftPanel(context: DrawContext, mouseX: Int, mouseY: Int) {
         val data = draft ?: return
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species)) ?: return
@@ -495,9 +495,9 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         else -> null
     }
 
-    // ---------- Ô party ----------
+    // ---------- Party slots ----------
 
-    // Toạ độ lấy từ PartyWidget của Cobblemon: widget ở (216, 24); ô đầu ở (+6, +7); cột phải lệch (+51, +8); hàng cách 32.
+    // Coordinates from Cobblemon's PartyWidget: widget at (216, 24); first slot at (+6, +7); right column offset (+51, +8); rows 32 apart.
     private fun partySlotPos(position: Int): Pair<Int, Int> {
         val odd = position % 2 == 1
         return Pair(left + 222 + if (odd) 51 else 0, top + 31 + (position / 2) * 32 + if (odd) 8 else 0)
@@ -527,7 +527,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    /** Vẽ model Pokémon trong ô party đúng theo PartySlotWidget: dịch tới (x+12.5, y-3), scale 2.5, góc xoay (13, 35, 0), scale 4.5. */
+    /** Draws the Pokémon model in a party slot exactly like PartySlotWidget: translate to (x+12.5, y-3), scale 2.5, rotation (13, 35, 0), scale 4.5. */
     private fun renderSlotModel(context: DrawContext, position: Int, x: Int, y: Int, data: PokemonEditData, delta: Float) {
         val pokemon = renderable(data) ?: return
         val key = modelKey(data)
@@ -556,24 +556,24 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
     }
 
     /**
-     * Vẽ các thành phần của ô party theo đúng thông số PartySlotWidget của Cobblemon 1.7.3:
-     * - Bóng bắt: "textures/gui/ball/<tên bóng>.png" tại (x-2, y-3), vùng 18x22 trong 18x44, scale 0.5 (vẽ SAU model).
-     * - Thanh HP: CobblemonResources.WHITE tại (x+4, y+25), cao 1, dài = 37 * hpRatio, màu getDepletableRedGreen.
-     * - Tên: font vanilla, scale 0.5, không bóng chữ, tại (x+4, y+20), căn trái, cắt "…" nếu dài.
-     * - Giới tính: "textures/gui/party/party_gender_male/female.png" 7x5, scale 0.5, tại (x+40, y+20).
-     * - Level: "cobblemon.ui.lv.number", scale 0.5, căn giữa tại (x+31, y+13), có bóng chữ.
-     * - Held item: tại (x+14, y+9.5), scale 0.5 (renderScaledGuiItemIcon).
+     * Draws the parts of a party slot with the exact values of Cobblemon's PartySlotWidget (unchanged from 1.7.3 to 1.8.4):
+     * - Ball: "textures/gui/ball/<ball name>.png" at (x-2, y-3), the 18x22 area of 18x44, scale 0.5 (drawn AFTER the model).
+     * - HP bar: CobblemonResources.WHITE at (x+4, y+25), height 1, length = 37 * hpRatio, color from getDepletableRedGreen.
+     * - Name: vanilla font, scale 0.5, no shadow, at (x+4, y+20), left-aligned, cut with "…" if too long.
+     * - Gender: "textures/gui/party/party_gender_male/female.png" 7x5, scale 0.5, at (x+40, y+20).
+     * - Level: "cobblemon.ui.lv.number", scale 0.5, centered at (x+31, y+13), with shadow.
+     * - Held item: at (x+14, y+9.5), scale 0.5 (renderScaledGuiItemIcon).
      */
     private fun renderSlotInfo(context: DrawContext, x: Int, y: Int, data: PokemonEditData) {
         val matrices = context.matrices
-        // 1. Bóng bắt (vẽ SAU model để nằm đè lên góc ô)
+        // 1. Ball (drawn AFTER the model so it sits on top of the slot corner)
         matrices.push()
         matrices.translate((x - 2).toDouble(), (y - 3).toDouble(), 0.0)
         matrices.scale(0.5f, 0.5f, 1f)
         context.drawTexture(GuiKit.ballGuiTexture(data.ball), 0, 0, 0f, 0f, 18, 22, 18, 44)
         matrices.pop()
 
-        // 2. Thanh HP
+        // 2. HP bar
         val hpPokemon = clientPokemon(data)
         val maxHp = (hpPokemon?.maxHealth ?: data.maxHealth).coerceAtLeast(1)
         val curHp = (hpPokemon?.currentHealth ?: data.currentHealth).coerceIn(0, maxHp)
@@ -596,7 +596,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             )
         }
 
-        // 3. Tên & Giới tính
+        // 3. Name & gender
         val species = PokemonSpecies.getByIdentifier(Identifier.of(data.species))
         val name = species?.translatedName ?: Text.literal(data.species)
         val genderTex = when (data.gender.uppercase()) {
@@ -624,7 +624,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             scale = 0.5f, minScale = 0.5f, bold = false, shadow = true, small = true,
         )
 
-        // 5. Held item trong ô
+        // 5. Held item in the slot
         val heldStack = heldItemStack(data)
         if (!heldStack.isEmpty) {
             renderScaledGuiItemIcon(
@@ -637,7 +637,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    /** Pokémon cùng UUID trong đội hình phía client (để lấy HP); null với Trainer Editor. */
+    /** The Pokémon with the same UUID in the client-side party (to read HP); null in the Trainer Editor. */
     private fun clientPokemon(data: PokemonEditData) =
         if (mode == EditorMode.TRAINER) null else CobblemonClient.storage.party.findByUUID(data.uuid)
 
@@ -666,7 +666,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         return Text.translatable("gui.${TrainersWorkshop.MOD_ID}.$key", view.name)
     }
 
-    /** Nhãn chế độ ở đầu khung phải: CREATIVE (tím) / SURVIVAL (xanh); Trainer Editor hiện tên trainer. */
+    /** Mode label at the top of the right frame: CREATIVE (purple) / SURVIVAL (green); the Trainer Editor shows the trainer name. */
     private fun renderModeLabel(context: DrawContext) {
         val (text, color) = when (mode) {
             EditorMode.CREATIVE -> Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.mode.creative"), GuiKit.CREATIVE_TAG)
@@ -681,7 +681,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         GuiKit.text(context, font, text, x, y, color, scale = GuiKit.MEDIUM, maxWidth = 94, minScale = 0.6f)
     }
 
-    // ---------- Dải chân: Cost + thông báo ----------
+    // ---------- Bottom strip: Cost + messages ----------
 
     private val footerTop: Int get() = top + GuiKit.BASE_HEIGHT
 
@@ -696,7 +696,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         if (mode == EditorMode.SURVIVAL) renderCost(context, mouseX, mouseY)
     }
 
-    /** Thông báo kết quả từ server, bên phải dải chân (tối đa 3 dòng, dòng dài bị cắt). */
+    /** Result message from the server, on the right of the bottom strip (at most 3 lines, long lines are cut). */
     private fun renderStatus(context: DrawContext) {
         val x = left + 236
         val y = footerTop + 7
@@ -714,7 +714,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         GuiKit.textWrapped(context, font, message, x, y, width, 3, color)
     }
 
-    /** Survival: vật phẩm sẽ bị trừ, đỏ nếu thiếu. Tối đa 2 cột x 4 dòng; phần dư xem trong tooltip. */
+    /** Survival: items that will be taken, red if missing. At most 2 columns x 4 lines; the rest is in the tooltip. */
     private fun renderCost(context: DrawContext, mouseX: Int, mouseY: Int) {
         val cost = survivalCost() ?: return
         val x = left + 8
@@ -733,7 +733,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
             val color = if (have >= count) GuiKit.WHITE else GuiKit.RED
             lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.line", count, item.name, have).string, color)
         }
-        // Vật phẩm của mod tuỳ chọn chưa cài (Only Bottle Caps, TMCraft).
+        // Item from an optional mod that isn't installed (Only Bottle Caps, TMCraft).
         cost.lines.filter { it.item == null }.map { it.missingItemId ?: it.field }.distinct().forEach { id ->
             lines += Pair(Text.translatable("gui.${TrainersWorkshop.MOD_ID}.cost.unavailable", id).string, GuiKit.RED)
         }
@@ -756,7 +756,7 @@ class EditorScreen(state: EditorState) : Screen(Text.translatable("screen.${Trai
         }
     }
 
-    // ---------- Chuột ----------
+    // ---------- Mouse ----------
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         for (position in 0 until 6) {

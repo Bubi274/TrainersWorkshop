@@ -14,10 +14,10 @@ import net.minecraft.text.Text
 import net.minecraft.util.Formatting
 import java.util.UUID
 
-/** Một màn hình đang mở của một người chơi. Server chỉ chấp nhận hành động khớp với phiên này. */
+/** One open screen of one player. The server only accepts actions that match this session. */
 open class EditorSession(val mode: EditorMode)
 
-/** Kết quả hiển thị ở cuối màn hình. */
+/** Result shown at the bottom of the screen. */
 data class EditorStatus(val key: String, val args: List<String> = emptyList(), val error: Boolean = false) {
     fun toNbt(): NbtCompound = NbtCompound().apply {
         putString("key", "message.${TrainersWorkshop.MOD_ID}.editor.$key")
@@ -70,7 +70,7 @@ object EditorSessions {
         }
     }
 
-    /** Hành động riêng của Trainer Editor. */
+    /** Actions only used by the Trainer Editor. */
     private fun handleExtra(player: ServerPlayerEntity, session: EditorSession, nbt: NbtCompound) {
         if (session is TrainerEditorSession) TrainerEditing.handle(player, session, nbt)
     }
@@ -116,7 +116,7 @@ object EditorSessions {
                 if (normalizedTarget == current) return EditorStatus("nothing_to_apply")
                 val options = PokemonEditing.options(pokemon)
                 PokemonEditing.validateMoves(pokemon, normalizedTarget.moves, options.legalMoves)?.let { return EditorStatus(it, error = true) }
-                // Level cap ở server: nhỏ hơn giữa cap RCT (nếu có) và level tối đa của Cobblemon.
+                // Server-side level cap: the lower of the RCT cap (if any) and Cobblemon's max level.
                 val levelCap = SurvivalCosts.levelLimit(PokemonEditing.maxLevel(), RctCompat.serverLevelCap(player))
                 val cost = SurvivalCosts.compute(current, normalizedTarget, options, levelCap) { player.inventory.count(it) }
                 cost.error?.let { return EditorStatus(it, error = true) }

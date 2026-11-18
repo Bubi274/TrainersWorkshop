@@ -8,13 +8,13 @@ import net.minecraft.util.ActionResult
 import java.util.UUID
 
 /**
- * Bắt sự kiện chuột phải vào entity khi đang cầm một [PokemonTargetItem] (vào Pokémon)
- * hoặc [EntityTargetItem] (vào entity khác, ví dụ trainer).
- * Chạy trước tương tác mặc định của Cobblemon/RCT nên không bị menu của chúng "giành" mất.
+ * Catches right-clicks on an entity while holding a [PokemonTargetItem] (on a Pokémon)
+ * or an [EntityTargetItem] (on another entity, for example a trainer).
+ * Runs before the default Cobblemon/RCT interaction, so their menus don't "steal" the click.
  *
- * Cách Fabric gọi sự kiện này: phía client chỉ gọi một lần; nếu ta trả về khác PASS, Fabric gửi
- * một gói tin "interact at" lên server, vẫy tay và bỏ qua xử lý mặc định. Phía server gọi sự kiện
- * cho mỗi gói tin nhận được, nên ta chặn xử lý lặp trong cùng một tick.
+ * How Fabric calls this event: the client calls it only once; if we return something other than PASS, Fabric sends
+ * an "interact at" packet to the server, swings the hand and skips the default handling. The server calls the event
+ * for every packet it receives, so we block repeated handling within the same tick.
  */
 object PokemonInteractionHandler {
     private val lastUse = HashMap<UUID, Pair<Int, Long>>()
@@ -28,7 +28,7 @@ object PokemonInteractionHandler {
             if (!handled || player.isSpectator) {
                 return@register ActionResult.PASS
             }
-            // Phía client chỉ vẫy tay và gửi gói tin; mọi kiểm tra làm ở server.
+            // The client only swings the hand and sends the packet; every check runs on the server.
             if (world.isClient || player !is ServerPlayerEntity) {
                 return@register ActionResult.SUCCESS
             }
@@ -43,7 +43,7 @@ object PokemonInteractionHandler {
         }
     }
 
-    /** Cùng người chơi, cùng entity, cùng tick: đã xử lý rồi. */
+    /** Same player, same entity, same tick: already handled. */
     private fun isRepeat(player: ServerPlayerEntity, entity: Entity, time: Long): Boolean {
         val key = Pair(entity.id, time)
         if (lastUse[player.uuid] == key) return true

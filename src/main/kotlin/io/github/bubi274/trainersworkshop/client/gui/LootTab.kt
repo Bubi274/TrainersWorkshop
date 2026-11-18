@@ -12,7 +12,7 @@ import net.minecraft.registry.RegistryWrapper
 import net.minecraft.text.Text
 import kotlin.math.roundToInt
 
-/** Thông tin trainer server gửi xuống (tên, đồ rơi...). */
+/** Trainer info sent by the server (name, loot...). */
 data class TrainerView(
     val name: String,
     val trainerId: String,
@@ -35,7 +35,7 @@ data class TrainerView(
     }
 }
 
-/** Tab đồ rơi của Trainer Editor: vật phẩm, số lượng, tỉ lệ; rơi mỗi lần thắng hay chỉ lần đầu. */
+/** Loot tab of the Trainer Editor: item, count, chance; drops on every win or only the first one. */
 class LootTab(screen: EditorScreen) : EditorTab(screen) {
     override val title: Text = gui("tab.loot")
     override val needsPokemon = false
@@ -87,7 +87,7 @@ class LootTab(screen: EditorScreen) : EditorTab(screen) {
         }
     }
 
-    /** Tỉ lệ: bấm ±5%, giữ Shift ±1%. */
+    /** Chance: click for ±5%, hold Shift for ±1%. */
     private fun chanceStep() = if (Screen.hasShiftDown()) 1 else 5
 
     private fun setEntry(index: Int, count: Int, chancePercent: Int) {

@@ -8,7 +8,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
-/** Chỉ áp các mixin cho Radical Cobblemon Trainers khi mod đó được cài. */
+/** Only applies the Radical Cobblemon Trainers mixins when that mod is installed. */
 public class TrainersWorkshopMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {

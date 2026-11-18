@@ -14,7 +14,7 @@ import net.minecraft.util.Hand
 import net.minecraft.util.TypedActionResult
 import net.minecraft.world.World
 
-/** PokeEditor: chuột phải (vào không khí) để mở màn hình chỉnh Pokémon trong đội. */
+/** PokeEditor: right-click (in the air) to open the editor screen for the Pokémon in your party. */
 class PokeEditorItem(settings: Item.Settings, private val mode: EditorMode) : Item(settings) {
 
     override fun use(world: World, user: PlayerEntity, hand: Hand): TypedActionResult<ItemStack> {

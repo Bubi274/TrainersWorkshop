@@ -8,7 +8,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.MinecraftClient
 import net.minecraft.nbt.NbtCompound
 
-/** Nhận trạng thái từ server và gửi hành động lên server. */
+/** Receives the state from the server and sends actions to the server. */
 object ClientEditor {
     fun register() {
         ClientPlayNetworking.registerGlobalReceiver(EditorStatePayload.ID) { payload, context ->

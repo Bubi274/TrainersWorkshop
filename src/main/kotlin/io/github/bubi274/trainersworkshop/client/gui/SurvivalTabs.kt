@@ -13,25 +13,25 @@ import net.minecraft.client.gui.screen.Screen
 import net.minecraft.text.Text
 
 /*
- * Các tab của PokeEditor bản survival: cùng giao diện với bản creative,
- * nhưng mỗi thay đổi cần vật phẩm và nút thiếu vật phẩm hiện chữ đỏ.
- * Số vật phẩm đang có hiện trong tooltip của nút và trong phần Cost ở chân màn hình.
+ * Tabs of the survival PokeEditor: same layout as the creative one,
+ * but every change needs items, and a button whose item is missing shows red text.
+ * The number of items you have is shown in the button tooltip and in the Cost area at the bottom of the screen.
  */
 
 /**
- * Tab IV / EV bản survival, có hai trang (IV và EV) như Stats của Summary.
+ * Survival IV / EV tab, with two pages (IVs and EVs) like the Summary Stats tab.
  *
- * IV gồm IV gốc và IV có hiệu lực, giống Cobblemon:
- * - "+"/"-": kẹo IV của Cobblemon (Health Candy... / Sickly Candy...), ±1 IV có hiệu lực (hyper train).
- * - "Max"/"0": Bottle Cap / Withered Bottle Cap (Only Bottle Caps), đặt IV gốc thành 31 / 0.
- * Nút bị khoá nếu thiếu vật phẩm hoặc vượt khoảng 0..31.
+ * IVs have a base IV and an effective IV, like Cobblemon:
+ * - "+"/"-": Cobblemon IV candies (Health Candy... / Sickly Candy...), ±1 effective IV (hyper training).
+ * - "Max"/"0": Bottle Cap / Withered Bottle Cap (Only Bottle Caps), sets the base IV to 31 / 0.
+ * A button is locked if the item is missing or the value would leave 0..31.
  */
 class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     private val original get() = screen.selectedSlot!!.data
     private val options get() = screen.selectedSlot!!.options
     private val player get() = MinecraftClient.getInstance().player
 
-    /** Thử một thay đổi: hợp lệ và đủ vật phẩm cho phần [field] thì mới mở nút. */
+    /** Tries a change: the button is only enabled if it is valid and there are enough items for [field]. */
     private fun allowed(field: String, change: (PokemonEditData) -> PokemonEditData): Boolean {
         val inventory = player?.inventory ?: return false
         val result = SurvivalCosts.compute(original, change(draft), options, screen.levelCap) { inventory.count(it) }
@@ -39,7 +39,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         return result.error == null && field !in result.problems && !goldProblem
     }
 
-    /** Mô tả nút kèm tên vật phẩm (dòng đầu) và số vật phẩm đang có (dòng xám phía dưới). */
+    /** Button description with the item name (first line) and the number you have (gray line below). */
     private fun tip(key: String, item: Item?): Text {
         val hint = gui(key).string
         return Text.literal(
@@ -50,7 +50,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         )
     }
 
-    /** Nút dùng vật phẩm: chữ đỏ nếu không có vật phẩm (hoặc mod chứa nó chưa cài). */
+    /** A button that uses an item: red text if you don't have the item (or its mod isn't installed). */
     private fun itemButton(label: Text, x: Int, y: Int, w: Int, item: Item?, hintKey: String, active: Boolean, onPress: () -> Unit) {
         val button = screen.button(label, x, y, w, 9, tip(hintKey, item), active, onPress)
         if (item == null || screen.haveCount(item) == 0) button.labelColor = GuiKit.RED
@@ -95,10 +95,10 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         goldButton(screen.panelX + 7, goldY + 10, SurvivalCosts.MIN_IV, draft.useGoldWithered, "button.gold_withered", SurvivalCosts.GOLD_WITHERED_CAP_ID, "hint.gold_withered", draft.useGoldCap)
     }
 
-    /** Nút "Max" (Bottle Cap) hoặc "0" (Withered Bottle Cap) cho IV gốc; bấm lần nữa để bỏ. */
+    /** "Max" (Bottle Cap) or "0" (Withered Bottle Cap) button for the base IV; click again to undo. */
     private fun baseButton(row: Int, x: Int, y: Int, w: Int, value: Int, labelKey: String, hintKey: String, itemId: String, gold: Boolean) {
         val planned = draft.ivs[row] == value && original.ivs[row] != value
-        // Only Bottle Caps không cho dùng nắp khi IV gốc đã đúng giá trị đó.
+        // Only Bottle Caps doesn't allow a cap when the base IV already has that value.
         val active = !gold && original.ivs[row] != value && (planned || allowed("iv.$row") { withBase(it, row, value) })
         val label = if (planned) gui("button.undo_short") else gui(labelKey)
         itemButton(label, x, y, w, SurvivalCosts.itemById(itemId), hintKey, active) {
@@ -117,8 +117,8 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     }
 
     /**
-     * Ghi IV hyper cho đúng cách Cobblemon lưu: hyper bằng IV gốc thì không lưu (NO_HYPER),
-     * và nếu không cần kẹo nào thì giữ nguyên giá trị cũ.
+     * Writes the hyper IV the way Cobblemon stores it: a hyper IV equal to the base IV is not stored (NO_HYPER),
+     * and if no candy is needed, the old value is kept.
      */
     private fun resolveHyper(row: Int, base: Int, effective: Int): Int {
         val originalHyper = original.hyperIvs[row]
@@ -133,7 +133,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     private fun withEffective(data: PokemonEditData, row: Int, effective: Int): PokemonEditData =
         data.copy(hyperIvs = data.hyperIvs.toMutableList().also { it[row] = resolveHyper(row, data.ivs[row], effective) })
 
-    /** Đổi IV gốc; IV có hiệu lực đi theo IV gốc nếu chưa hyper train. */
+    /** Changes the base IV; the effective IV follows the base IV if it isn't hyper trained. */
     private fun withBase(data: PokemonEditData, row: Int, base: Int): PokemonEditData {
         val effective = data.hyperIvs[row].takeIf { it >= 0 } ?: base
         val ivs = data.ivs.toMutableList().also { it[row] = base }
@@ -154,7 +154,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
 
     // ---------- EV ----------
 
-    /** EV: "-" berry giảm EV (-10), "+1" feather, "+10" vitamin (thiếu vitamin thì bù bằng feather), "Max" tăng tối đa có thể. */
+    /** EVs: "-" EV-lowering berry (-10), "+1" feather, "+10" vitamin (feathers fill in for missing vitamins), "Max" raises as far as possible. */
     private fun initEvs(x: Int) {
         EDITOR_STATS.forEachIndexed { row, stat ->
             val y = rowY(row) + 1
@@ -187,7 +187,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         }
     }
 
-    /** Mức EV tối đa đạt được cho hàng [row] theo số vitamin + feather hiện có, giới hạn 252 mỗi chỉ số và 510 tổng. */
+    /** Highest EV reachable for [row] with the vitamins + feathers you have, limited to 252 per stat and 510 in total. */
     private fun maxEvGoal(row: Int, vitamin: Item?, feather: Item?): Int {
         val current = draft.evs[row]
         val base = original.evs[row]
@@ -203,7 +203,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
         return minOf(capLimit, base + bestDiff)
     }
 
-    /** Trên mức gốc: bỏ bớt phần định tăng. Từ mức gốc trở xuống: mỗi berry giảm 10. */
+    /** Above the original value: removes part of the planned raise. At or below the original value: each berry lowers it by 10. */
     private fun evDown(row: Int): Int {
         val current = draft.evs[row]
         val base = original.evs[row]
@@ -216,7 +216,7 @@ class SurvivalStatsTab(screen: EditorScreen) : StatPageTab(screen) {
     private fun setEv(data: PokemonEditData, row: Int, value: Int) =
         data.copy(evs = data.evs.toMutableList().also { it[row] = value })
 
-    // ---------- Vẽ ----------
+    // ---------- Drawing ----------
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         drawStatLabels(context)
@@ -246,14 +246,14 @@ class SurvivalMovesTab(screen: EditorScreen) : MovesTab(screen) {
 
     private fun tmItem(move: String) = SurvivalCosts.itemById(SurvivalCosts.tmId(move))
 
-    /** Chiêu chưa học: chỉ chọn được nếu TM tồn tại (TMCraft) và chiêu dạy được bằng TM. */
+    /** A move not learned yet: can only be picked if the TM exists (TMCraft) and the move can be taught by TM. */
     override fun isSelectable(move: String): Boolean {
         if (isFree(move)) return true
         val slot = screen.selectedSlot ?: return false
         return move in slot.options.tmMoves && tmItem(move) != null
     }
 
-    /** "Free" / "TM x2" (có 2 TM) / "No TM" (không dạy được bằng TM). */
+    /** "Free" / "TM x2" (you have 2 TMs) / "No TM" (can't be taught by TM). */
     override fun rowTag(move: String): Pair<Text, Int>? {
         if (move.isEmpty()) return null
         if (isFree(move)) return Pair(gui("tag.free"), GuiKit.GREEN)
@@ -281,10 +281,10 @@ class SurvivalNatureTab(screen: EditorScreen) : NatureTab(screen) {
 
     override fun chosen(): String = draft.effectiveNature
 
-    /** Nature khác cần Mint đúng loại. */
+    /** Another nature needs the matching Mint. */
     override fun isSelectable(nature: String): Boolean = nature == original.effectiveNature || mint(nature) != null
 
-    /** "Requires Timid Mint (have 1)", đỏ nếu chưa có. */
+    /** "Requires Timid Mint (have 1)", red if you have none. */
     override fun costLine(): Pair<Text, Int>? {
         val nature = chosen()
         if (nature == original.effectiveNature) return null
@@ -305,7 +305,7 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     private val options get() = screen.selectedSlot!!.options
     private val player get() = MinecraftClient.getInstance().player
 
-    /** Chỉ được bật shiny (tốn 1 Shiny Berry), không tắt được. */
+    /** Shiny can only be turned on (costs 1 Shiny Berry), not off. */
     override fun initShiny(x: Int, y: Int, w: Int) {
         val berry = SurvivalCosts.itemById("trainers_workshop:shiny_berry")
         val have = berry?.let { screen.haveCount(it) } ?: 0
@@ -318,8 +318,8 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     override val levelEditable: Boolean get() = true
 
     /**
-     * Hàng Level: "+1" (lên 1 level) và "Max" (lên tối đa min(cap, level hiện tại + số Rare Candy)).
-     * Mỗi level tốn 1 Rare Candy. Chỉ tăng, không giảm. Khoá nút nếu đã tới cap hoặc không đủ kẹo.
+     * Level row: "+1" (up 1 level) and "Max" (up to min(cap, current level + Rare Candies owned)).
+     * Each level costs 1 Rare Candy. Only up, never down. Buttons are locked at the cap or without enough candies.
      */
     override fun initLevel(x: Int, y: Int) {
         val inventory = player?.inventory ?: return
@@ -383,7 +383,7 @@ class SurvivalOtherTab(screen: EditorScreen) : OtherTab(screen) {
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         super.render(context, mouseX, mouseY, delta)
         val font = screen.font
-        // "Lv. hiện tại → Lv. mục tiêu" ở giữa hai nút, và "Cap: Lv. X" bên dưới.
+        // "Lv. current → Lv. target" between the two buttons, and "Cap: Lv. X" below.
         val changed = draft.level != original.level
         val levelText = if (changed) gui("level_change", original.level, draft.level) else gui("level", draft.level)
         val levelColor = when {

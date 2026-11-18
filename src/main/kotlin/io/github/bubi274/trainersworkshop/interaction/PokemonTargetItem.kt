@@ -6,8 +6,8 @@ import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.util.ActionResult
 
 /**
- * Item dùng bằng cách chuột phải vào một Pokémon ngoài thế giới.
- * Hàm này luôn chạy ở phía server.
+ * An item used by right-clicking a Pokémon in the world.
+ * This function always runs on the server.
  */
 interface PokemonTargetItem {
     fun useOnPokemon(player: ServerPlayerEntity, entity: PokemonEntity, stack: ItemStack): ActionResult

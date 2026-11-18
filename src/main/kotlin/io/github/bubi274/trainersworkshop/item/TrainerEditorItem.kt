@@ -18,7 +18,7 @@ import net.minecraft.util.Hand
 import net.minecraft.util.TypedActionResult
 import net.minecraft.world.World
 
-/** Trainer Editor: chuột phải vào trainer của Radical Cobblemon Trainers để chỉnh đội hình và đồ rơi. Chỉ Creative. */
+/** Trainer Editor: right-click a Radical Cobblemon Trainers trainer to edit its team and loot. Creative only. */
 class TrainerEditorItem(settings: Item.Settings) : Item(settings), EntityTargetItem {
 
     override fun canTarget(entity: Entity): Boolean = RctCompat.isTrainer(entity)
@@ -32,7 +32,7 @@ class TrainerEditorItem(settings: Item.Settings) : Item(settings), EntityTargetI
         return ActionResult.SUCCESS
     }
 
-    /** Chuột phải vào không khí: nhắc cách dùng (hoặc báo thiếu RCT). */
+    /** Right-click in the air: show how to use it (or say that RCT is missing). */
     override fun use(world: World, user: PlayerEntity, hand: Hand): TypedActionResult<ItemStack> {
         val stack = user.getStackInHand(hand)
         if (!world.isClient) {

@@ -16,7 +16,7 @@ import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import net.minecraft.registry.Registries
 import net.minecraft.util.Identifier
 
-/** Đọc và ghi dữ liệu Pokémon cho màn hình chỉnh sửa. Chỉ dùng ở phía server. */
+/** Reads and writes Pokémon data for the editor screen. Server side only. */
 object PokemonEditing {
     const val MAX_IV = 31
     const val MAX_EV = 252
@@ -91,8 +91,8 @@ object PokemonEditing {
     }
 
     /**
-     * Kiểm tra trạng thái mong muốn ở chế độ creative.
-     * Trả về khoá lỗi (để dịch) hoặc null nếu hợp lệ.
+     * Checks the wanted state in creative mode.
+     * Returns an error key (to translate) or null if valid.
      */
     fun validateCreative(pokemon: Pokemon, target: PokemonEditData): String? {
         val options = options(pokemon)
@@ -107,7 +107,7 @@ object PokemonEditing {
         return validateMoves(pokemon, target.moves, options.legalMoves)
     }
 
-    /** Chiêu: không trùng, đều tồn tại, nằm trong danh sách cho phép, không làm trống ô đang có chiêu. */
+    /** Moves: no duplicates, all exist, all in the allowed list, and no slot that has a move becomes empty. */
     fun validateMoves(pokemon: Pokemon, moves: List<String>, allowed: List<String>): String? {
         if (moves.size != MOVE_SLOTS) return "invalid_moves"
         val chosen = moves.filter { it.isNotEmpty() }
@@ -118,9 +118,9 @@ object PokemonEditing {
         return null
     }
 
-    /** Ghi mọi thay đổi (đã kiểm tra bằng [validateCreative]) vào Pokémon. */
+    /** Writes every change (already checked with [validateCreative]) to the Pokémon. */
     fun applyCreative(pokemon: Pokemon, target: PokemonEditData) {
-        // Level trước, vì danh sách chiêu theo level phụ thuộc vào nó.
+        // Level first, because the level-up move list depends on it.
         if (pokemon.level != target.level) pokemon.level = target.level
         Gender.entries.firstOrNull { it.name == target.gender }?.let { if (pokemon.gender != it) pokemon.gender = it }
 
@@ -136,7 +136,7 @@ object PokemonEditing {
             if (potential != null) {
                 pokemon.updateAbility(potential.template.create(false, potential.priority))
             } else if (template != null) {
-                // Ability hiện tại nằm ngoài pool của loài: giữ dạng "forced" như Cobblemon.
+                // The current ability is outside the species pool: keep it "forced" like Cobblemon does.
                 pokemon.updateAbility(template.create(true, pokemon.ability.priority))
             }
         }
@@ -148,15 +148,15 @@ object PokemonEditing {
         PokeBalls.getPokeBall(Identifier.of(target.ball))?.let { if (pokemon.caughtBall != it) pokemon.caughtBall = it }
     }
 
-    /** Ghi thay đổi survival (đã kiểm tra chi phí bằng SurvivalCosts). Chỉ đổi IV, EV, nature (mint), chiêu, shiny. */
+    /** Writes the survival changes (costs already checked with SurvivalCosts). Only changes IVs, EVs, nature (mint), moves, shiny. */
     fun applySurvival(pokemon: Pokemon, current: PokemonEditData, target: PokemonEditData) {
-        // 0) Level trước (giống bản Creative), vì chiêu học theo level phụ thuộc vào nó.
+        // 0) Level first (like the Creative version), because level-up moves depend on it.
         applyLevelByExperience(pokemon, target.level)
-        // 1) Bottle Cap / Withered Bottle Cap: Only Bottle Caps đổi IV gốc bằng Pokemon.setIV.
+        // 1) Bottle Cap / Withered Bottle Cap: Only Bottle Caps changes the base IV with Pokemon.setIV.
         setIvs(pokemon, target.ivs)
-        // TODO(build): thử trong game rằng kết quả giống hệt khi ăn từng viên kẹo (xem tooltip "effective IV").
-        // 2) Kẹo IV: giống HyperTrainingItem của Cobblemon, mỗi kẹo gọi
-        //    hyperTrainIV(stat, IV có hiệu lực ± 1); IV gốc không đổi.
+        // TODO(build): test in game that the result is exactly the same as eating the candies one by one (see the "effective IV" tooltip).
+        // 2) IV candies: like Cobblemon's HyperTrainingItem, each candy calls
+        //    hyperTrainIV(stat, effective IV ± 1); the base IV doesn't change.
         EDITOR_STATS.forEachIndexed { i, stat ->
             if (target.hyperIvs[i] == current.hyperIvs[i]) return@forEachIndexed
             val goal = target.effectiveIv(i)
@@ -164,32 +164,32 @@ object PokemonEditing {
                 val effective = pokemon.ivs.getEffectiveBattleIV(stat)
                 if (effective == goal) return@forEachIndexed
                 pokemon.hyperTrainIV(stat, if (goal > effective) effective + 1 else effective - 1)
-                // Sự kiện của Cobblemon có thể huỷ việc hyper train: dừng để không lặp mãi.
+                // A Cobblemon event can cancel hyper training: stop so the loop doesn't run forever.
                 if (pokemon.ivs.getEffectiveBattleIV(stat) == effective) return@forEachIndexed
             }
         }
         setEvs(pokemon, target.evs)
         if (target.effectiveNature != current.effectiveNature) {
-            // Giống hệt khi dùng mint của Cobblemon: chỉ đặt mintedNature.
+            // Exactly like using a Cobblemon mint: only mintedNature is set.
             Natures.getNature(Identifier.of(target.mintedNature))?.let { pokemon.mintedNature = it }
         }
         if (target.ability != current.ability) {
-            // Giống AbilityChangeItem / AbilityTypeChanger của Cobblemon: forced = false, priority = potential.priority.
+            // Like Cobblemon's AbilityChangeItem / AbilityTypeChanger: forced = false, priority = potential.priority.
             val potential = pokemon.form.abilities.firstOrNull { it.template.name == target.ability }
             if (potential != null) {
                 pokemon.updateAbility(potential.template.create(false, potential.priority))
             }
         }
-        // Chỉ đổi chiêu khi người chơi có chọn: nếu không, chiêu Pokémon vừa học khi lên level được giữ nguyên.
+        // Only change moves if the player picked some: otherwise the moves just learned on level-up are kept.
         if (target.moves != current.moves) applyMoves(pokemon, target.moves)
         if (target.shiny && !pokemon.shiny) pokemon.shiny = true
     }
 
     /**
-     * Tăng level bằng cách cộng đúng số EXP còn thiếu để tới [level] (API EXP của Cobblemon),
-     * để Pokémon học chiêu theo level như khi dùng kẹo. Không gọi evolve: Cobblemon tự gửi thông báo
-     * tiến hoá như bình thường và người chơi tự chọn. Phần EXP dư của viên kẹo cuối bị bỏ.
-     * Ném lỗi nếu level cuối cùng không đúng (để Apply hoàn trả kẹo và khôi phục Pokémon).
+     * Raises the level by adding exactly the EXP still missing to reach [level] (Cobblemon's EXP API),
+     * so the Pokémon learns level-up moves like with candies. Doesn't call evolve: Cobblemon sends the evolution
+     * notification as usual and the player chooses. Leftover EXP of the last candy is dropped.
+     * Throws if the final level is wrong (so Apply refunds the candies and restores the Pokémon).
      */
     fun applyLevelByExperience(pokemon: Pokemon, level: Int) {
         if (level <= pokemon.level) return
@@ -206,14 +206,14 @@ object PokemonEditing {
 
     fun setEvs(pokemon: Pokemon, evs: List<Int>) {
         if (EDITOR_STATS.indices.all { pokemon.evs.getOrDefault(EDITOR_STATS[it]) == evs[it] }) return
-        // Đưa về 0 trước để không vướng giới hạn tổng 510 khi chuyển EV giữa các chỉ số.
+        // Set to 0 first so the 510 total limit doesn't get in the way when moving EVs between stats.
         EDITOR_STATS.forEach { pokemon.setEV(it, 0) }
         EDITOR_STATS.forEachIndexed { i, stat -> if (evs[i] > 0) pokemon.setEV(stat, evs[i]) }
     }
 
     /**
-     * Tính sẵn danh sách 4 chiêu cuối cùng rồi ghi một lần duy nhất trong cơ chế tắt phát sự kiện
-     * (doWithoutEmitting / doThenEmit) để chỉ gửi đúng 1 gói cập nhật moveset và 1 gói cập nhật benchedMoves.
+     * Works out the final list of 4 moves first, then writes it once with event emitting turned off
+     * (doWithoutEmitting / doThenEmit), so exactly 1 moveset update packet and 1 benchedMoves update packet are sent.
      */
     fun applyMoves(pokemon: Pokemon, moves: List<String>) {
         if (currentMoves(pokemon) == moves) return

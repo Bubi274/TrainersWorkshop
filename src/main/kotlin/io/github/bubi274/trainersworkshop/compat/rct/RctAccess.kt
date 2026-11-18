@@ -18,11 +18,11 @@ import net.minecraft.util.Identifier
 import net.minecraft.server.MinecraftServer
 import java.util.UUID
 
-/** Mọi thao tác chạm tới class của RCT. Chỉ được nạp khi RCT đã cài (xem RctCompat). */
+/** Everything that touches RCT classes. Only loaded when RCT is installed (see RctCompat). */
 object RctAccess {
     private const val ID_PREFIX = "${TrainersWorkshop.MOD_ID}_"
 
-    /** Đội đã dựng cho từng trainer: entity UUID -> (phiên bản chỉnh sửa, TrainerNPC). */
+    /** Team built for each trainer: entity UUID -> (edit version, TrainerNPC). */
     private val built = HashMap<UUID, Pair<Int, TrainerNPC>>()
 
     private val registry: TrainerRegistry get() = ModCommon.RCT.trainerRegistry
@@ -52,7 +52,7 @@ object RctAccess {
 
     private var levelCapWarned = false
 
-    /** Gọi API level cap của RCT; mọi lỗi (đổi phiên bản, thiếu class...) trả về null và chỉ ghi log một lần. */
+    /** Calls the RCT level cap API; any error (version change, missing class...) returns null and is logged only once. */
     private fun levelCapOrNull(read: () -> Int): Int? = try {
         read()
     } catch (e: Throwable) {
@@ -69,7 +69,7 @@ object RctAccess {
     fun clientLevelCap(player: PlayerEntity): Int? =
         levelCapOrNull { PlayerState.get(player).levelCap }
 
-    /** Kiểm tra lúc khởi động: các hàm RCT mà mixin bám vào còn tồn tại không. */
+    /** Startup check: do the RCT methods the mixins hook into still exist? */
     fun checkHooks() {
         val ok = runCatching {
             RCTMod::class.java.getMethod("makeBattle", TrainerMob::class.java, PlayerEntity::class.java)
@@ -79,7 +79,7 @@ object RctAccess {
     }
 
     /**
-     * Gọi từ mixin khi RCT bắt đầu trận đấu: trả về TrainerNPC có đội đã chỉnh, hoặc null để dùng đội gốc.
+     * Called from the mixin when RCT starts a battle: returns a TrainerNPC with the edited team, or null to use the original team.
      */
     @JvmStatic
     fun editedTrainer(mob: TrainerMob): Trainer? = try {
@@ -101,7 +101,7 @@ object RctAccess {
         }
         val original = registry.getById(mob.trainerId, TrainerNPC::class.java) ?: return null
         val pokemon = team.map { Pokemon.loadFromNBT(server.registryManager, it) }.toTypedArray()
-        // TODO(rct): gimmick (Mega/Tera/Dynamax) gắn theo UUID Pokémon gốc, nên đội đã chỉnh thường mất gimmick.
+        // TODO(rct): gimmicks (Mega/Tera/Dynamax) are linked to the original Pokémon UUIDs, so an edited team usually loses them.
         val npc = TrainerNPC(
             original.name,
             pokemon,
@@ -118,8 +118,8 @@ object RctAccess {
     }
 
     /**
-     * Gọi từ mixin khi trainer bị đánh bại và RCT sắp thả đồ.
-     * Thả đồ tuỳ chỉnh; trả về true nếu cần bỏ bảng loot mặc định của RCT.
+     * Called from the mixin when a trainer is defeated and RCT is about to drop loot.
+     * Drops the custom loot; returns true if RCT's default loot table should be skipped.
      */
     @JvmStatic
     fun dropEditedLoot(mob: TrainerMob, player: PlayerEntity): Boolean = try {

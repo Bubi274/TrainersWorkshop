@@ -25,7 +25,7 @@ class LevelRulesTest {
     fun atCapCannotRaise() {
         assertEquals(30, LevelRules.maxLevel(from = 30, cap = 30, rareCandies = 50))
         assertEquals("level_over_cap", LevelRules.error(30, 31, 30))
-        // Đang trên cap (cap bị hạ): không tăng được, nhưng giữ nguyên level thì hợp lệ.
+        // Already above the cap (the cap was lowered): can't go up, but keeping the same level is valid.
         assertEquals(35, LevelRules.maxLevel(from = 35, cap = 30, rareCandies = 50))
         assertNull(LevelRules.error(35, 35, 30))
     }

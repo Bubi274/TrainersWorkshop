@@ -8,25 +8,25 @@ import net.minecraft.network.codec.PacketCodec
 import net.minecraft.network.codec.PacketCodecs
 import net.minecraft.network.packet.CustomPayload
 
-/** Server -> client: trạng thái màn hình chỉnh sửa (xem EditorState). */
+/** Server -> client: the editor screen state (see EditorState). */
 data class EditorStatePayload(val nbt: NbtCompound) : CustomPayload {
     override fun getId(): CustomPayload.Id<EditorStatePayload> = ID
 
     companion object {
         val ID = CustomPayload.Id<EditorStatePayload>(TrainersWorkshop.id("editor_state"))
-        // TODO(build): chưa biên dịch được; kiểm tra PacketCodecs.UNLIMITED_NBT_COMPOUND có kiểu PacketCodec<ByteBuf, NbtCompound>.
+        // TODO(build): not compiled yet; check that PacketCodecs.UNLIMITED_NBT_COMPOUND is a PacketCodec<ByteBuf, NbtCompound>.
         val CODEC: PacketCodec<ByteBuf, EditorStatePayload> =
             PacketCodecs.UNLIMITED_NBT_COMPOUND.xmap<EditorStatePayload>({ EditorStatePayload(it) }, { it.nbt })
     }
 }
 
-/** Client -> server: một hành động trên màn hình (apply, close...). Server kiểm tra lại toàn bộ. */
+/** Client -> server: one action on the screen (apply, close...). The server checks everything again. */
 data class EditorActionPayload(val nbt: NbtCompound) : CustomPayload {
     override fun getId(): CustomPayload.Id<EditorActionPayload> = ID
 
     companion object {
         val ID = CustomPayload.Id<EditorActionPayload>(TrainersWorkshop.id("editor_action"))
-        // Có giới hạn kích thước, tránh client gửi gói tin quá lớn.
+        // Size-limited, so a client can't send a packet that is too large.
         val CODEC: PacketCodec<ByteBuf, EditorActionPayload> =
             PacketCodecs.NBT_COMPOUND.xmap<EditorActionPayload>({ EditorActionPayload(it) }, { it.nbt })
     }

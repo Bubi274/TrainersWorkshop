@@ -9,23 +9,23 @@ import net.minecraft.nbt.NbtString
 import java.util.UUID
 
 /*
- * Dữ liệu trao đổi giữa server và màn hình chỉnh sửa.
- * Client chỉ hiển thị và gửi "trạng thái mong muốn"; server luôn kiểm tra lại mọi thứ.
+ * Data exchanged between the server and the editor screen.
+ * The client only shows it and sends the "wanted state"; the server always checks everything again.
  */
 
 enum class EditorMode { CREATIVE, SURVIVAL, TRAINER }
 
-/** Thứ tự 6 chỉ số dùng trong mảng IV/EV. */
+/** Order of the 6 stats used in the IV/EV lists. */
 val EDITOR_STATS: List<Stat> = listOf(
     Stats.HP, Stats.ATTACK, Stats.DEFENCE, Stats.SPECIAL_ATTACK, Stats.SPECIAL_DEFENCE, Stats.SPEED,
 )
 
 const val MOVE_SLOTS = 4
 
-/** Giá trị trong PokemonEditData.hyperIvs khi chỉ số đó không được "hyper train". */
+/** Value in PokemonEditData.hyperIvs when that stat is not hyper trained. */
 const val NO_HYPER = -1
 
-/** Các giá trị chỉnh được của một Pokémon. */
+/** The editable values of one Pokémon. */
 data class PokemonEditData(
     val uuid: UUID,
     val species: String,
@@ -33,39 +33,39 @@ data class PokemonEditData(
     val level: Int,
     val shiny: Boolean,
     val gender: String,
-    /** Nature gốc (identifier). */
+    /** Original nature (identifier). */
     val nature: String,
-    /** Nature do mint ("" nếu chưa dùng mint). */
+    /** Nature from a mint ("" if no mint was used). */
     val mintedNature: String,
     val ability: String,
-    /** Ability đang có bị ép ngoài pool (forced = true trong Cobblemon). */
+    /** The current ability is forced outside the species pool (forced = true in Cobblemon). */
     val abilityForced: Boolean = false,
-    /** IV gốc. */
+    /** Base IVs. */
     val ivs: List<Int>,
     /**
-     * IV "hyper trained" của Cobblemon (kẹo IV ghi vào đây), -1 nếu không có.
-     * IV có hiệu lực trong trận = hyper nếu có, ngược lại là IV gốc.
+     * Cobblemon's "hyper trained" IVs (IV candies write here), -1 if there is none.
+     * The effective IV in battle = the hyper IV if there is one, otherwise the base IV.
      */
     val hyperIvs: List<Int> = List(EDITOR_STATS.size) { NO_HYPER },
     val evs: List<Int>,
-    /** Luôn có [MOVE_SLOTS] phần tử, "" là ô trống. */
+    /** Always has [MOVE_SLOTS] entries, "" is an empty slot. */
     val moves: List<String>,
     val ball: String,
-    /** HP hiện tại và tối đa (để vẽ thanh HP giống PartySlotWidget ở cả 3 chế độ). */
+    /** Current and max HP (to draw the HP bar like PartySlotWidget in all 3 modes). */
     val currentHealth: Int = 1,
     val maxHealth: Int = 1,
-    /** Vật phẩm đang cầm (chỉ hiển thị, không chỉnh sửa). */
+    /** Held item (only shown, not editable). */
     val heldItemId: String = "",
     val heldItemCount: Int = 0,
-    /** Survival: dùng Gold Bottle Cap để đưa cả 6 IV gốc lên 31. */
+    /** Survival: use a Gold Bottle Cap to raise all 6 base IVs to 31. */
     val useGoldCap: Boolean = false,
-    /** Survival: dùng Gold Withered Bottle Cap để đưa cả 6 IV gốc về 0. */
+    /** Survival: use a Gold Withered Bottle Cap to lower all 6 base IVs to 0. */
     val useGoldWithered: Boolean = false,
 ) {
-    /** IV có hiệu lực (giống IVs.getEffectiveBattleIV của Cobblemon). */
+    /** Effective IV (same as Cobblemon's IVs.getEffectiveBattleIV). */
     fun effectiveIv(index: Int): Int = hyperIvs[index].takeIf { it >= 0 } ?: ivs[index]
 
-    /** Nature đang có hiệu lực (mint nếu có). */
+    /** The nature in effect (the mint if there is one). */
     val effectiveNature: String get() = mintedNature.ifEmpty { nature }
 
     fun toNbt(): NbtCompound = NbtCompound().apply {
@@ -119,18 +119,18 @@ data class PokemonEditData(
     }
 }
 
-/** Những lựa chọn hợp lệ do server tính sẵn cho từng Pokémon. */
+/** Valid choices the server works out for each Pokémon. */
 data class PokemonEditOptions(
-    /** Mọi chiêu loài này học được (kèm các chiêu đang có). */
+    /** Every move this species can learn (plus the moves it has now). */
     val legalMoves: List<String>,
-    /** Chiêu đổi miễn phí: đã từng học hoặc học theo level. */
+    /** Moves that are free to swap in: already learned before, or learned by level. */
     val freeMoves: List<String>,
-    /** Chiêu dạy được bằng TM của TMCraft (học theo level hoặc theo TM). */
+    /** Moves that a TMCraft TM can teach (learned by level or by TM). */
     val tmMoves: List<String>,
     val abilities: List<String>,
-    /** Ability thường của loài (CommonAbilityType). */
+    /** The species' common abilities (CommonAbilityType). */
     val commonAbilities: List<String> = emptyList(),
-    /** Ability ẩn của loài (HiddenAbilityType). */
+    /** The species' hidden abilities (HiddenAbilityType). */
     val hiddenAbilities: List<String> = emptyList(),
     val genders: List<String>,
 ) {
@@ -173,14 +173,14 @@ data class EditorSlot(val index: Int, val data: PokemonEditData, val options: Po
     }
 }
 
-/** Toàn bộ trạng thái màn hình, server gửi xuống mỗi khi mở hoặc có thay đổi. */
+/** The whole screen state, sent by the server when the screen opens or something changes. */
 data class EditorState(
     val mode: EditorMode,
-    /** Tối đa 6 ô; ô trống không có trong danh sách. */
+    /** At most 6 slots; empty slots are not in the list. */
     val slots: List<EditorSlot>,
     val maxLevel: Int,
     val balls: List<String>,
-    /** Chỉ có ở chế độ TRAINER. */
+    /** Only present in TRAINER mode. */
     val trainer: NbtCompound? = null,
 ) {
     fun slot(index: Int): EditorSlot? = slots.firstOrNull { it.index == index }
@@ -204,7 +204,7 @@ data class EditorState(
     }
 }
 
-/** Các hành động client gửi lên server. */
+/** Actions the client sends to the server. */
 object EditorActions {
     const val APPLY = "apply"
     const val CLOSE = "close"

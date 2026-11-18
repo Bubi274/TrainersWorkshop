@@ -15,7 +15,7 @@ import net.minecraft.text.Text
 import net.minecraft.util.ActionResult
 import net.minecraft.util.Formatting
 
-/** Shiny Berry: chuột phải vào Pokémon của mình đang được thả ra để biến nó thành shiny. */
+/** Shiny Berry: right-click one of your own sent-out Pokémon to make it shiny. */
 class ShinyBerryItem(settings: Item.Settings) : Item(settings), PokemonTargetItem {
 
     override fun useOnPokemon(player: ServerPlayerEntity, entity: PokemonEntity, stack: ItemStack): ActionResult {

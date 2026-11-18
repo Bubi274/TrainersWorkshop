@@ -14,9 +14,9 @@ import net.minecraft.registry.RegistryKeys
 import net.minecraft.util.Identifier
 
 /**
- * Tích hợp tuỳ chọn với Cobblemon Raid Dens: thêm Shiny Berry vào phần thưởng raid 7 sao.
- * Sửa bảng loot lúc tải, không ghi đè file của mod raid. Không cài Raid Dens thì bảng này
- * không tồn tại và đoạn mã dưới đây đơn giản là không làm gì.
+ * Optional integration with Cobblemon Raid Dens: adds the Shiny Berry to 7-star raid rewards.
+ * Changes the loot table while it loads, without overwriting the raid mod's files. Without Raid Dens this table
+ * doesn't exist and the code below simply does nothing.
  */
 object RaidDensCompat {
     private val TIER_SEVEN: RegistryKey<LootTable> = RegistryKey.of(
@@ -28,7 +28,7 @@ object RaidDensCompat {
         LootTableEvents.MODIFY.register { key, tableBuilder, _, _ ->
             if (key != TIER_SEVEN) return@register
 
-            // Đọc lại config mỗi lần tải bảng loot, nên /reload áp dụng tỉ lệ mới mà không cần khởi động lại.
+            // Reads the config again every time loot tables load, so /reload applies a new chance without a restart.
             WorkshopConfig.load()
             val chance = WorkshopConfig.data.raidTierSevenShinyBerryChance.toFloat()
             if (chance <= 0f) return@register
