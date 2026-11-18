@@ -71,6 +71,7 @@ object PokemonEditing {
             freeMoves = free.distinct().sorted(),
             tmMoves = tm.distinct().sorted(),
             cobblemonTmMoves = cobblemonTm.distinct().sorted(),
+            eggMoves = learnset.eggMoves.map { it.name }.distinct().sorted(),
             abilities = abilities.distinct(),
             commonAbilities = commonAbilities,
             hiddenAbilities = hiddenAbilities,

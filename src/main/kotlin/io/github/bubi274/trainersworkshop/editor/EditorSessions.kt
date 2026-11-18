@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.battles.BattleRegistry
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import io.github.bubi274.trainersworkshop.compat.BottleCapsCompat
+import io.github.bubi274.trainersworkshop.config.WorkshopConfig
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
 import io.github.bubi274.trainersworkshop.network.EditorActionPayload
 import io.github.bubi274.trainersworkshop.network.EditorStatePayload
@@ -69,6 +70,7 @@ object EditorSessions {
     private fun survivalRules() = SurvivalRules(
         bottleCapMode = BottleCapsCompat.mode(),
         infiniteTms = Cobblemon.config.infiniteTmUses,
+        eggMoveGemCost = WorkshopConfig.data.eggMoveGemCost,
     )
 
     private fun handle(player: ServerPlayerEntity, nbt: NbtCompound) {

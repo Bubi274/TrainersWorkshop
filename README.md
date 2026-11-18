@@ -53,6 +53,7 @@ items are used.
 | Change nature | The mint for the new nature (Cobblemon). Works exactly like using the mint normally. |
 | Change ability | An Ability Capsule (to the other common ability) or an Ability Patch (to the hidden ability), from Cobblemon. Like in Cobblemon 1.8, each Ability Capsule gives back an empty Glass Bottle. |
 | Switch to a move the Pokémon has already learned | Free |
+| Teach an egg move that no TM can teach | Type Gems of the move's type (Cobblemon 1.8), for example 3 Water Gems for Aqua Jet. The amount is `eggMoveGemCost` in the config (default 3). |
 | Teach a new move | One TM for that move: a Cobblemon TM (`cobblemon:technical_machine`) or a TMCraft TM. If you have both, the Cobblemon TM is used. The TM is used up, except a Cobblemon TM when Cobblemon's `infiniteTmUses` config is on. |
 | Make shiny | One Shiny Berry |
 | Raise the level by 1 | One Rare Candy (Cobblemon). See below. |
@@ -182,13 +183,15 @@ On first launch, the mod creates `config/trainers_workshop.json`:
 
 ```json
 {
-  "raidTierSevenShinyBerryChance": 0.05
+  "raidTierSevenShinyBerryChance": 0.05,
+  "eggMoveGemCost": 3
 }
 ```
 
 - `raidTierSevenShinyBerryChance` is the chance for a 7-star raid to drop a Shiny Berry, from `0.0` to `1.0`
   (`0.05` = 5%, `0` = disabled).
-- After editing, run `/reload` or restart the server to apply the change.
+- `eggMoveGemCost` is how many Type Gems teaching one egg move costs in the Survival PokeEditor (`1` to `64`).
+- After editing, restart the server to apply the change (`/reload` also re-reads the file when Cobblemon Raid Dens is installed).
 - To confirm the raid integration loaded, look for `Added Shiny Berry to cobblemonraiddens:raid/tier/tier_seven`
   in `logs/latest.log`.
 

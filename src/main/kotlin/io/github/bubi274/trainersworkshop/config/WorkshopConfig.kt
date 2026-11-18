@@ -2,6 +2,7 @@ package io.github.bubi274.trainersworkshop.config
 
 import com.google.gson.GsonBuilder
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.editor.MoveSourceRules
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Files
 
@@ -9,6 +10,8 @@ import java.nio.file.Files
 data class WorkshopConfigData(
     /** Shiny Berry drop chance from 7-star raids (0.05 = 5%). */
     var raidTierSevenShinyBerryChance: Double = 0.05,
+    /** Type Gems needed to teach one egg move in the Survival PokeEditor (1..64). */
+    var eggMoveGemCost: Int = 3,
 )
 
 object WorkshopConfig {
@@ -31,6 +34,7 @@ object WorkshopConfig {
             WorkshopConfigData()
         }
         data.raidTierSevenShinyBerryChance = data.raidTierSevenShinyBerryChance.coerceIn(0.0, 1.0)
+        data.eggMoveGemCost = MoveSourceRules.gemCost(data.eggMoveGemCost)
         save()
     }
 

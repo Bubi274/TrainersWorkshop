@@ -136,6 +136,8 @@ data class PokemonEditOptions(
     val tmMoves: List<String>,
     /** Moves that a Cobblemon 1.8 TM can teach (Learnset.tmLearnableMoves, only moves that have a Cobblemon TM). */
     val cobblemonTmMoves: List<String> = emptyList(),
+    /** The species' egg moves (Learnset.eggMoves); without a TM they can be taught with Type Gems. */
+    val eggMoves: List<String> = emptyList(),
     val abilities: List<String>,
     /** The species' common abilities (CommonAbilityType). */
     val commonAbilities: List<String> = emptyList(),
@@ -148,6 +150,7 @@ data class PokemonEditOptions(
         put("freeMoves", stringList(freeMoves))
         put("tmMoves", stringList(tmMoves))
         put("cobblemonTmMoves", stringList(cobblemonTmMoves))
+        put("eggMoves", stringList(eggMoves))
         put("abilities", stringList(abilities))
         put("commonAbilities", stringList(commonAbilities))
         put("hiddenAbilities", stringList(hiddenAbilities))
@@ -160,6 +163,7 @@ data class PokemonEditOptions(
             freeMoves = readStringList(nbt, "freeMoves"),
             tmMoves = readStringList(nbt, "tmMoves"),
             cobblemonTmMoves = readStringList(nbt, "cobblemonTmMoves"),
+            eggMoves = readStringList(nbt, "eggMoves"),
             abilities = readStringList(nbt, "abilities"),
             commonAbilities = readStringList(nbt, "commonAbilities"),
             hiddenAbilities = readStringList(nbt, "hiddenAbilities"),
@@ -206,6 +210,7 @@ data class EditorState(
         trainer?.let { put("trainer", it) }
         putString("bottleCapMode", rules.bottleCapMode.name)
         putBoolean("infiniteTms", rules.infiniteTms)
+        putInt("eggMoveGemCost", rules.eggMoveGemCost)
     }
 
     companion object {
@@ -218,6 +223,7 @@ data class EditorState(
             rules = SurvivalRules(
                 bottleCapMode = BottleCapMode.fromName(nbt.getString("bottleCapMode")),
                 infiniteTms = nbt.getBoolean("infiniteTms"),
+                eggMoveGemCost = if (nbt.contains("eggMoveGemCost")) MoveSourceRules.gemCost(nbt.getInt("eggMoveGemCost")) else MoveSourceRules.DEFAULT_GEM_COST,
             ),
         )
     }
@@ -229,6 +235,8 @@ data class SurvivalRules(
     val bottleCapMode: BottleCapMode = BottleCapMode.HYPER_TRAIN,
     /** Cobblemon's infiniteTmUses config: Cobblemon TMs are still needed but not used up. */
     val infiniteTms: Boolean = false,
+    /** Type Gems per egg move (config eggMoveGemCost). */
+    val eggMoveGemCost: Int = MoveSourceRules.DEFAULT_GEM_COST,
 )
 
 /** Actions the client sends to the server. */

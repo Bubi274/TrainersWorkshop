@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.CobblemonItems
 import com.cobblemon.mod.common.api.moves.Moves
 import com.cobblemon.mod.common.api.pokemon.stats.Stat
 import com.cobblemon.mod.common.api.pokemon.stats.Stats
+import com.cobblemon.mod.common.item.GemItem
 import com.cobblemon.mod.common.item.berry.FriendshipRaisingBerryItem
 import com.cobblemon.mod.common.item.interactive.EVIncreaseItem
 import com.cobblemon.mod.common.item.interactive.HyperTrainingItem
@@ -177,6 +178,7 @@ object SurvivalCosts {
         mints.values.forEach { add(it) }
         options?.tmMoves?.forEach { move -> add(tmcraftTm(move)) }
         options?.cobblemonTmMoves?.forEach { move -> h = 31 * h + have(cobblemonTm(move)) }
+        options?.eggMoves?.forEach { move -> add(gemFor(move)) }
         return h
     }
 
@@ -378,7 +380,10 @@ object SurvivalCosts {
         }
     }
 
-    /** Each new move needs one TM: a Cobblemon TM or a TMCraft TM ([tmFor]). */
+    /**
+     * Each new move needs one TM (a Cobblemon TM or a TMCraft TM, [tmFor]); an egg move that no TM can teach needs
+     * [SurvivalRules.eggMoveGemCost] Type Gems of its type instead ([MoveSourceRules]).
+     */
     private fun addMoveCosts(
         current: PokemonEditData,
         target: PokemonEditData,
@@ -389,11 +394,37 @@ object SurvivalCosts {
     ): String? {
         target.moves.forEachIndexed { slot, move ->
             if (move.isEmpty() || move == current.moves[slot] || move in options.freeMoves || move in current.moves) return@forEachIndexed
-            val tm = tmFor(move, options, have) ?: return "survival_move"
-            lines += Line("move.$slot", tm, 1, consumed = TmRules.consumes(tmSource(tm), rules.infiniteTms))
+            when (moveSource(move, options)) {
+                MoveSource.TM -> {
+                    val tm = tmFor(move, options, have) ?: return "survival_move"
+                    lines += Line("move.$slot", tm, 1, consumed = TmRules.consumes(tmSource(tm), rules.infiniteTms))
+                }
+                MoveSource.GEM -> lines += Line("move.$slot", gemFor(move), rules.eggMoveGemCost)
+                else -> return "survival_move"
+            }
         }
         return null
     }
+
+    // ---------- Egg moves (Type Gems) ----------
+
+    /**
+     * The Cobblemon 1.8 Type Gem for [move]'s type, for example cobblemon:water_gem for a Water move.
+     * Cobblemon's own TM recipes use the same item ids (for example data/cobblemon/tms/acidspray.json uses cobblemon:poison_gem); null if the item is missing or isn't a GemItem.
+     */
+    fun gemFor(move: String): Item? {
+        val type = Moves.getByName(move)?.elementalType ?: return null
+        return itemById("cobblemon:${type.name.lowercase()}_gem")?.takeIf { it is GemItem }
+    }
+
+    /** How a not-yet-known [move] is paid for ([MoveSourceRules.source]). */
+    fun moveSource(move: String, options: PokemonEditOptions): MoveSource =
+        MoveSourceRules.source(
+            free = move in options.freeMoves,
+            tmCanTeach = canTeachByTm(move, options),
+            isEggMove = move in options.eggMoves,
+            gemExists = gemFor(move) != null,
+        )
 
     // ---------- TMs (Cobblemon 1.8 and TMCraft) ----------
 
