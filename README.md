@@ -124,6 +124,31 @@ default team. Teams saved with version 2.1.0 get their gimmicks back from the or
 species in the same slot still matches. Details are in
 [docs/trainer-editor-notes.md](docs/trainer-editor-notes.md).
 
+## Challenge mode
+
+Roll a team of 6 on [PokéRoll](https://github.com/Bubi274/PokeRoll), copy its Challenge code (`TW1.…`) and
+beat a Gym Leader, Elite Four member or Champion with that team. The code format is in
+[docs/challenge-code.md](docs/challenge-code.md).
+
+- **Start:** copy the code, then run `/challenge paste` (or press the "Paste challenge code" key, unbound by
+  default in Controls). The code is read from the clipboard, so the 256-character chat limit doesn't matter.
+  Command blocks and the server console can use `execute as <player> run challenge start <code>`.
+- **Which Pokémon count:** only Pokémon you catch, hatch or receive after the start, and that you never owned
+  before (checked by the Pokémon's UUID). Each team slot allows that Pokémon and all its later evolutions
+  (with `special: null`, also its regional forms and their evolutions); older `exact` slots allow only that
+  species in its base form. Each party Pokémon needs its own slot.
+- **Challenge battles:** the Gym Leaders, Elite Four and Champions of Kanto, Johto, Hoenn and Sinnoh
+  (`challengeRegions` in the config). With a party that doesn't fit, the battle is cancelled and the chat says why.
+  Other trainers are never checked.
+- **Win:** the challenge is complete; roll a new team. Beating all 4 Elite Four of one region gives a Master Ball,
+  beating a Champion gives a Shiny Berry; each only once.
+- **Loss:** pick **Keep going**, **Reroll 1** (the reroll code `TWR1.…` is copied to your clipboard: paste it on
+  PokéRoll, reroll 1 slot, copy the new TW1 code and `/challenge paste` it) or **Reroll all 6** (the team is
+  cleared; use Start over on PokéRoll for a new challenge).
+- **Shiny slots:** each slot rolled shiny gives 128 EV feathers of a stat you pick (pick before battling).
+- Other commands: `/challenge` (status), `/challenge copyreroll`, `/challenge abandon` (no penalty).
+- Until the challenge screens are done, the choices are clickable lines in chat.
+
 ## Dependencies
 
 | Mod | Version | Required |
@@ -191,7 +216,17 @@ On first launch, the mod creates `config/trainers_workshop.json`:
   "raidTierSevenShinyBerryChance": 0.05,
   "eggMoveGemCost": 3,
   "alphaTrainerLevelBonus": 5,
-  "rctLootOnRematch": true
+  "rctLootOnRematch": true,
+  "unlimitedRematches": true,
+  "challengeRegions": [
+    {
+      "id": "kanto",
+      "enabled": true,
+      "gymLeaders": ["kanto_brock", "..."],
+      "eliteFour": [["kanto_league_lorelei"], ["kanto_league_bruno"], ["kanto_league_agatha"], ["kanto_league_lance"]],
+      "champions": [["kanto_champion_blue"]]
+    }
+  ]
 }
 ```
 
@@ -201,6 +236,12 @@ On first launch, the mod creates `config/trainers_workshop.json`:
 - `eggMoveGemCost` is how many Type Gems teaching one egg move costs in the Survival PokeEditor (`1` to `64`).
 - `rctLootOnRematch`: `false` = beating an RCT trainer you already beat drops nothing from RCT's loot table
   (badges only drop on the first win anyway). Custom loot set with the Trainer Editor still follows its own rule.
+- `unlimitedRematches`: `true` = every RCT trainer can be battled again any number of times, even after you won
+  (RCT's own limit is `maxTrainerDefeats` in the trainer data). Series progress and the level cap don't change on a rematch.
+- `challengeRegions` lists the challenge battles by region (RCT trainer IDs). The defaults are the four COBBLEVERSE
+  regions (on) and RCT's Radical Red, BDSP and Unbound series (off: set `"enabled": true` to use them).
+  In `eliteFour` and `champions`, each inner list is one person; list several IDs when RCT has several versions of
+  the same trainer (any of them counts). Delete the whole `challengeRegions` entry to get the defaults back.
 - After editing, restart the server to apply the change (`/reload` also re-reads the file when Cobblemon Raid Dens is installed).
 - To confirm the raid integration loaded, look for `Added Shiny Berry to cobblemonraiddens:raid/tier/tier_seven`
   in `logs/latest.log`.
