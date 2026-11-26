@@ -21,7 +21,11 @@ object ChallengeService {
     private var server: MinecraftServer? = null
 
     fun register() {
-        ServerLifecycleEvents.SERVER_STARTED.register { server = it }
+        ServerLifecycleEvents.SERVER_STARTED.register {
+            server = it
+            CobblemonForms.clearCache()
+        }
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register { _, _, _ -> CobblemonForms.clearCache() }
         ServerLifecycleEvents.SERVER_STOPPED.register { server = null }
         ServerPlayConnectionEvents.JOIN.register { handler, _, _ -> sweep(handler.player) }
 

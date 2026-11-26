@@ -16,6 +16,7 @@ import java.util.UUID
  * [code] is the TW1 code exactly as pasted (trimmed): PokéRoll compares reroll codes by that exact string.
  * [startSeq] is the ownership-ledger position at the original start; "Reroll 1" doesn't change it.
  * [rerollAllow] is set after the player picked "Reroll 1": the game is waiting for the rerolled TW1 code.
+ * [defeatPending] is set after a lost challenge battle until the player picks Keep going / Reroll 1 / Reroll all 6.
  */
 data class ActiveChallenge(
     val code: String,
@@ -23,6 +24,7 @@ data class ActiveChallenge(
     val startSeq: Long,
     val startedAt: Long,
     val rerollAllow: Int? = null,
+    val defeatPending: Boolean = false,
 )
 
 /** Everything the mod remembers about one player's challenges. */
@@ -88,6 +90,7 @@ class PlayerChallengeData {
                 putLong("startSeq", a.startSeq)
                 putLong("startedAt", a.startedAt)
                 a.rerollAllow?.let { putInt("rerollAllow", it) }
+                if (a.defeatPending) putBoolean("defeatPending", true)
             })
         }
         put("ledger", NbtList().apply {
@@ -114,6 +117,7 @@ class PlayerChallengeData {
                         startSeq = a.getLong("startSeq"),
                         startedAt = a.getLong("startedAt"),
                         rerollAllow = if (a.contains("rerollAllow")) a.getInt("rerollAllow") else null,
+                        defeatPending = a.getBoolean("defeatPending"),
                     )
                 } catch (e: ChallengeCodeException) {
                     TrainersWorkshop.LOGGER.warn("Dropping a saved challenge whose code can't be read: {}", e.message)
@@ -169,13 +173,49 @@ class ChallengeState : PersistentState() {
         return active
     }
 
-    /** "Reroll 1" after a loss: returns the TWR1 code for PokéRoll and waits for the rerolled TW1 code. */
-    fun requestReroll(player: UUID, allow: Int = 1): String {
+    /** A challenge battle was lost: the player now picks Keep going / Reroll 1 / Reroll all 6. */
+    fun recordLoss(player: UUID): ActiveChallenge {
         val data = player(player)
         val active = data.active ?: throw ChallengeActionException("You have no challenge.")
-        data.active = active.copy(rerollAllow = allow)
+        val next = active.copy(defeatPending = true)
+        data.active = next
+        markDirty()
+        return next
+    }
+
+    private fun pendingDefeat(player: UUID): Pair<PlayerChallengeData, ActiveChallenge> {
+        val data = player(player)
+        val active = data.active ?: throw ChallengeActionException("You have no challenge.")
+        if (!active.defeatPending) throw ChallengeActionException("This choice is only for right after a lost challenge battle.")
+        return data to active
+    }
+
+    /** "Keep going" after a loss: nothing changes. */
+    fun keepGoing(player: UUID): ActiveChallenge {
+        val (data, active) = pendingDefeat(player)
+        val next = active.copy(defeatPending = false)
+        data.active = next
+        markDirty()
+        return next
+    }
+
+    /** "Reroll 1" after a loss: returns the TWR1 code for PokéRoll and waits for the rerolled TW1 code. */
+    fun requestReroll(player: UUID, allow: Int = 1): String {
+        val (data, active) = pendingDefeat(player)
+        data.active = active.copy(rerollAllow = allow, defeatPending = false)
         markDirty()
         return ChallengeCode.encodeReroll(active.code, allow)
+    }
+
+    /**
+     * "Reroll all 6" after a loss: no reroll code; the team is cleared. The player uses Start over on PokéRoll and
+     * pastes a new TW1 code, which is a new challenge with a new start.
+     */
+    fun rerollAll(player: UUID): ActiveChallenge {
+        val (data, active) = pendingDefeat(player)
+        data.active = null
+        markDirty()
+        return active
     }
 
     /** The TWR1 code of the reroll the player is waiting for (to copy it again). */

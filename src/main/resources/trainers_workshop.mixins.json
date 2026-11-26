@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "rct.RCTModMixin",
+    "rct.TrainerBattleMixin",
     "rct.TrainerMobMixin"
   ],
   "injectors": {

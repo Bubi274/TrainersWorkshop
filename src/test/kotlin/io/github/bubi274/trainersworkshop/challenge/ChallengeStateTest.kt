@@ -67,6 +67,7 @@ class ChallengeStateTest {
         val state = ChallengeState()
         val first = state.start(player, codes[0], now = 0)
         state.recordOwned(player, newMon)
+        state.recordLoss(player)
         val rerollCode = state.requestReroll(player, 1)
         assertEquals(codes[0], ChallengeCode.decodeReroll(rerollCode).code)
         val next = state.applyReroll(player, codes[1])
@@ -74,6 +75,32 @@ class ChallengeStateTest {
         assertEquals(first.startSeq, next.startSeq)
         assertNull(next.rerollAllow)
         assertTrue(state.player(player).obtainedDuringChallenge(newMon))
+    }
+
+    @Test
+    fun defeatChoicesOnlyRightAfterALoss() {
+        val state = ChallengeState()
+        state.start(player, codes[0], now = 0)
+        assertThrows(ChallengeActionException::class.java) { state.requestReroll(player, 1) }
+        assertThrows(ChallengeActionException::class.java) { state.keepGoing(player) }
+        assertThrows(ChallengeActionException::class.java) { state.rerollAll(player) }
+
+        assertTrue(state.recordLoss(player).defeatPending)
+        assertFalse(state.keepGoing(player).defeatPending)
+        assertThrows(ChallengeActionException::class.java) { state.keepGoing(player) }
+    }
+
+    @Test
+    fun rerollAllSixClearsTheTeam() {
+        val state = ChallengeState()
+        state.start(player, codes[0], now = 0)
+        state.recordLoss(player)
+        state.rerollAll(player)
+        assertNull(state.player(player).active)
+        // The next code is a new challenge with a new start: Pokémon from the old one don't count.
+        state.recordOwned(player, newMon)
+        state.start(player, codes[1], now = 0)
+        assertFalse(state.player(player).obtainedDuringChallenge(newMon))
     }
 
     @Test
@@ -87,6 +114,7 @@ class ChallengeStateTest {
     fun aWrongRerollIsRefusedAndNothingChanges() {
         val state = ChallengeState()
         state.start(player, codes[1], now = 0)
+        state.recordLoss(player)
         state.requestReroll(player, 1)
         // codes[0] is the parent of codes[1], not a reroll of it.
         assertThrows(ChallengeActionException::class.java) { state.applyReroll(player, codes[0]) }
@@ -109,6 +137,7 @@ class ChallengeStateTest {
         assertEquals(emptyList<Int>(), data.unpaidShinySlots())
 
         // The reroll result keeps slot 3 (not rerolled), so it stays paid.
+        state.recordLoss(player)
         state.requestReroll(player, 1)
         state.applyReroll(player, codes[1])
         assertEquals(emptyList<Int>(), data.unpaidShinySlots())
@@ -142,8 +171,10 @@ class ChallengeStateTest {
         state.start(player, codes[0], now = 1234)
         state.recordOwned(player, newMon)
         state.markShinyPaid(player, 2)
+        state.recordLoss(player)
         state.requestReroll(player, 1)
         state.player(player).eliteFourBeaten += "kanto_league_lorelei"
+        state.player(player).active = state.player(player).active!!.copy(defeatPending = true)
         state.player(player).championsRewarded += "kanto_champion_blue"
 
         val loaded = ChallengeState.fromNbt(state.writeTo(NbtCompound()))

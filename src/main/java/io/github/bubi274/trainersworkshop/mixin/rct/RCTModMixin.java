@@ -8,7 +8,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import io.github.bubi274.trainersworkshop.compat.rct.RctAccess;
 import org.spongepowered.asm.mixin.Mixin;
+import net.minecraft.entity.player.PlayerEntity;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * When RCT starts a battle, use the edited team of this exact trainer (if there is one).
@@ -29,5 +32,16 @@ public abstract class RCTModMixin {
     private Trainer trainersWorkshop$useEditedTeam(TrainerRegistry registry, String id, Class<?> type, Operation<Trainer> original, @Local(argsOnly = true) TrainerMob mob) {
         Trainer edited = RctAccess.editedTrainer(mob);
         return edited != null ? edited : original.call(registry, id, type);
+    }
+
+    /**
+     * Challenge mode: a Gym Leader / Elite Four / Champion battle with a party that doesn't fit the team is cancelled here.
+     * Returning false from makeBattle makes TrainerMob.startBattleWith just return (no start dialog, no cooldown).
+     */
+    @Inject(method = "makeBattle", at = @At("HEAD"), cancellable = true, require = 0)
+    private void trainersWorkshop$checkChallenge(TrainerMob mob, PlayerEntity player, CallbackInfoReturnable<Boolean> cir) {
+        if (RctAccess.blockChallengeBattle(mob, player)) {
+            cir.setReturnValue(false);
+        }
     }
 }

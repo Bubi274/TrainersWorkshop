@@ -1,5 +1,6 @@
 package io.github.bubi274.trainersworkshop.challenge
 
+import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
@@ -7,6 +8,7 @@ import io.github.bubi274.trainersworkshop.network.ChallengeClipboardPayload
 import io.github.bubi274.trainersworkshop.network.ChallengePastePayload
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.command.CommandSource
 import net.minecraft.server.command.CommandManager
 import net.minecraft.server.command.ServerCommandSource
 import net.minecraft.server.network.ServerPlayerEntity
@@ -48,7 +50,26 @@ object ChallengeCommand {
                     // The client catches "/challenge paste" before it is sent; this only runs without the mod on the client.
                     .then(CommandManager.literal("paste").executes { run(it) { _, _ -> throw ChallengeActionException(PASTE_NEEDS_CLIENT) } })
                     .then(CommandManager.literal("copyreroll").executes { run(it) { player, reply -> copyReroll(player, reply) } })
-                    .then(CommandManager.literal("abandon").executes { run(it) { player, reply -> abandon(player, reply) } }),
+                    .then(CommandManager.literal("abandon").executes { run(it) { player, reply -> abandon(player, reply) } })
+                    .then(
+                        CommandManager.literal("defeat")
+                            .then(CommandManager.literal("keep").executes { run(it) { player, reply -> keepGoing(player, reply) } })
+                            .then(CommandManager.literal("reroll1").executes { run(it) { player, reply -> rerollOne(player, reply) } })
+                            .then(CommandManager.literal("rerollall").executes { run(it) { player, reply -> rerollAll(player, reply) } }),
+                    )
+                    .then(
+                        CommandManager.literal("shiny").then(
+                            CommandManager.argument("slot", IntegerArgumentType.integer(1, ChallengeCode.TEAM_SIZE)).then(
+                                CommandManager.argument("stat", StringArgumentType.word())
+                                    .suggests { _, builder -> CommandSource.suggestMatching(ShinyReward.FEATHERS.keys, builder) }
+                                    .executes {
+                                        run(it) { player, reply ->
+                                            shiny(player, IntegerArgumentType.getInteger(it, "slot") - 1, StringArgumentType.getString(it, "stat"), reply)
+                                        }
+                                    },
+                            ),
+                        ),
+                    ),
             )
         }
 
@@ -96,8 +117,15 @@ object ChallengeCommand {
         val active = ChallengeService.start(player, code)
         reply(Text.translatable("$KEY.started", active.challenge.id).formatted(Formatting.GREEN))
         teamLines(active).forEach(reply)
+        shinyPrompt(player, active, reply)
+    }
+
+    /** "Shiny reward waiting" plus one line of stat buttons per unpaid shiny slot. */
+    private fun shinyPrompt(player: ServerPlayerEntity, active: ActiveChallenge, reply: (Text) -> Unit) {
         val unpaid = ChallengeService.data(player).unpaidShinySlots()
-        if (unpaid.isNotEmpty()) reply(Text.translatable("$KEY.shiny_pending", unpaid.size).formatted(Formatting.GOLD))
+        if (unpaid.isEmpty()) return
+        reply(Text.translatable("$KEY.shiny_pending", unpaid.size).formatted(Formatting.GOLD))
+        ChallengeBattles.shinyChoices(active, unpaid).forEach(reply)
     }
 
     private fun reroll(player: ServerPlayerEntity, code: String, reply: (Text) -> Unit) {
@@ -105,6 +133,28 @@ object ChallengeCommand {
         val slots = active.challenge.rerolled.joinToString(", ") { (it + 1).toString() }
         reply(Text.translatable("$KEY.rerolled", active.challenge.id, slots).formatted(Formatting.GREEN))
         teamLines(active).forEach(reply)
+        shinyPrompt(player, active, reply)
+    }
+
+    private fun keepGoing(player: ServerPlayerEntity, reply: (Text) -> Unit) {
+        ChallengeState.get(player.server).keepGoing(player.uuid)
+        reply(Text.translatable("$KEY.kept_going").formatted(Formatting.GREEN))
+    }
+
+    private fun rerollOne(player: ServerPlayerEntity, reply: (Text) -> Unit) {
+        ChallengeState.get(player.server).requestReroll(player.uuid, 1)
+        reply(Text.translatable("$KEY.reroll_requested").formatted(Formatting.GOLD))
+        copyReroll(player, reply)
+    }
+
+    private fun rerollAll(player: ServerPlayerEntity, reply: (Text) -> Unit) {
+        val old = ChallengeState.get(player.server).rerollAll(player.uuid)
+        reply(Text.translatable("$KEY.rerolled_all", old.challenge.id).formatted(Formatting.GOLD))
+    }
+
+    private fun shiny(player: ServerPlayerEntity, slot: Int, stat: String, reply: (Text) -> Unit) {
+        ChallengeBattles.claimShiny(player, slot, stat)
+        reply(Text.translatable("$KEY.shiny_given", ShinyReward.FEATHERS_PER_SLOT, ShinyReward.LABELS[stat.lowercase()] ?: stat, slot + 1).formatted(Formatting.GREEN))
     }
 
     /** Puts the TWR1 code on the player's clipboard (or, without the mod on the client, a chat line to click). */
@@ -141,8 +191,11 @@ object ChallengeCommand {
         if (active.rerollAllow != null) {
             reply(Text.translatable("$KEY.reroll_waiting", active.rerollAllow).formatted(Formatting.GOLD))
         }
-        val unpaid = data.unpaidShinySlots()
-        if (unpaid.isNotEmpty()) reply(Text.translatable("$KEY.shiny_pending", unpaid.size).formatted(Formatting.GOLD))
+        if (active.defeatPending) {
+            reply(Text.translatable("$KEY.defeat_waiting").formatted(Formatting.RED))
+            reply(ChallengeBattles.defeatChoices())
+        }
+        shinyPrompt(player, active, reply)
     }
 
     /** One line per slot, for example "1. Nidoran♀ – evo" or "3. Flabébé – evo ★". */

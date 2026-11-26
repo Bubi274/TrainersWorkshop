@@ -7,9 +7,11 @@ import com.gitlab.srcmc.rctapi.api.trainer.TrainerNPC
 import com.gitlab.srcmc.rctapi.api.trainer.TrainerRegistry
 import com.gitlab.srcmc.rctmod.ModCommon
 import com.gitlab.srcmc.rctmod.api.RCTMod
+import com.gitlab.srcmc.rctmod.api.data.TrainerBattle
 import com.gitlab.srcmc.rctmod.api.data.sync.PlayerState
 import com.gitlab.srcmc.rctmod.world.entities.TrainerMob
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.challenge.ChallengeBattles
 import io.github.bubi274.trainersworkshop.config.WorkshopConfig
 import io.github.bubi274.trainersworkshop.rematch.RematchRules
 import io.github.bubi274.trainersworkshop.editor.LootMode
@@ -21,6 +23,7 @@ import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.network.ServerPlayerEntity
 import java.util.UUID
 
 /** Everything that touches RCT classes. Only loaded when RCT is installed (see RctCompat). */
@@ -111,6 +114,14 @@ object RctAccess {
             TrainerMob::class.java.getDeclaredMethod("dropBattleLoot", Identifier::class.java, PlayerEntity::class.java)
         }.isSuccess
         if (!ok) RctCompat.warn("This RCT version is not supported: Trainer Editor changes will not apply in battles.")
+        val challengeOk = runCatching {
+            TrainerBattle::class.java.getMethod("distributeRewards", Boolean::class.javaPrimitiveType)
+            TrainerMob::class.java.getMethod("couldBattleAgainst", Entity::class.java)
+            TrainerMob::class.java.getDeclaredMethod("finishBattle", TrainerBattle::class.java, Boolean::class.javaPrimitiveType)
+            TrainerMob::class.java.getMethod("wasDefeatedBy", UUID::class.java)
+            TrainerMob::class.java.getMethod("wasVictoriousAgainst", UUID::class.java)
+        }.isSuccess
+        if (!challengeOk) RctCompat.warn("This RCT version is not supported: challenge results and unlimited rematches may not work.")
     }
 
     /**
@@ -176,6 +187,36 @@ object RctAccess {
         }
         return skipEdited || RematchRules.skipRctLoot(WorkshopConfig.data.rctLootOnRematch, defeatCount(mob, player))
     }
+
+    // ---------- Challenge mode and rematches ----------
+
+    /** Called from the mixin at the start of RCTMod.makeBattle: true cancels the battle (challenge party check). */
+    @JvmStatic
+    fun blockChallengeBattle(mob: TrainerMob, player: PlayerEntity): Boolean = try {
+        val server = player as? ServerPlayerEntity
+        val id = mob.trainerId
+        server != null && id != null && ChallengeBattles.shouldBlock(server, id)
+    } catch (e: Exception) {
+        RctCompat.warn("Challenge check failed for ${mob.trainerId}; the battle goes ahead.", e)
+        false
+    }
+
+    /** Called from the mixin at the start of TrainerBattle.distributeRewards ([initiatorWon] = the player's side won). */
+    @JvmStatic
+    fun onBattleResult(battle: TrainerBattle, initiatorWon: Boolean) {
+        try {
+            val players = battle.initiatorSidePlayers
+            if (players.size != 1 || battle.trainerSideMobs.isEmpty()) return
+            val player = players[0] as? ServerPlayerEntity ?: return
+            ChallengeBattles.onResult(player, battle.trainerSideMobs.mapNotNull { it.trainerId }, initiatorWon)
+        } catch (e: Exception) {
+            RctCompat.warn("Could not record a challenge battle result.", e)
+        }
+    }
+
+    /** Config unlimitedRematches: RCT's "beaten too often" checks are skipped (see TrainerMobMixin). */
+    @JvmStatic
+    fun unlimitedRematches(): Boolean = WorkshopConfig.data.unlimitedRematches
 
     /** How often [player] has beaten this trainer, this win included (0 if RCT can't tell). */
     private fun defeatCount(mob: TrainerMob, player: PlayerEntity): Int = try {

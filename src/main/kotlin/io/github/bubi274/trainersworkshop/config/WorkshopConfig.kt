@@ -2,6 +2,8 @@ package io.github.bubi274.trainersworkshop.config
 
 import com.google.gson.GsonBuilder
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.challenge.ChallengeRegion
+import io.github.bubi274.trainersworkshop.challenge.ChallengeTrainers
 import io.github.bubi274.trainersworkshop.editor.AlphaRules
 import io.github.bubi274.trainersworkshop.editor.MoveSourceRules
 import net.fabricmc.loader.api.FabricLoader
@@ -17,6 +19,10 @@ data class WorkshopConfigData(
     var alphaTrainerLevelBonus: Int = 5,
     /** false: a rematch win against an RCT trainer drops nothing from RCT's loot table (badges only drop on the first win anyway). */
     var rctLootOnRematch: Boolean = true,
+    /** true: every RCT trainer can be battled again any number of times, even after the player won. */
+    var unlimitedRematches: Boolean = true,
+    /** Gym Leaders, Elite Four and Champions that are challenge battles, by region (see ChallengeTrainers.DEFAULTS). */
+    var challengeRegions: List<ChallengeRegion> = ChallengeTrainers.DEFAULTS,
 )
 
 object WorkshopConfig {
@@ -41,6 +47,7 @@ object WorkshopConfig {
         data.raidTierSevenShinyBerryChance = data.raidTierSevenShinyBerryChance.coerceIn(0.0, 1.0)
         data.eggMoveGemCost = MoveSourceRules.gemCost(data.eggMoveGemCost)
         data.alphaTrainerLevelBonus = AlphaRules.levelBonus(data.alphaTrainerLevelBonus)
+        data.challengeRegions = ChallengeTrainers.sanitize(data.challengeRegions)
         save()
     }
 
