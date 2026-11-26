@@ -27,3 +27,6 @@ bin/
 
 # OS
 .DS_Store
+
+# Log files written by the unit tests
+logs/
