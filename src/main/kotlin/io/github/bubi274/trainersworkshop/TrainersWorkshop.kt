@@ -1,5 +1,6 @@
 package io.github.bubi274.trainersworkshop
 
+import io.github.bubi274.trainersworkshop.challenge.ChallengeCommand
 import io.github.bubi274.trainersworkshop.challenge.ChallengeService
 import io.github.bubi274.trainersworkshop.compat.RaidDensCompat
 import io.github.bubi274.trainersworkshop.compat.rct.RctCompat
@@ -33,6 +34,7 @@ object TrainersWorkshop : ModInitializer {
         RaidDensCompat.register()
         RctCompat.init()
         ChallengeService.register()
+        ChallengeCommand.register()
 
         // The trainer was killed/removed for good: also drop its saved edits.
         ServerEntityEvents.ENTITY_UNLOAD.register { entity, world ->

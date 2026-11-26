@@ -218,5 +218,13 @@
   "message.trainers_workshop.editor.trainer_no_gmax": "This species and its evolutions have no Gigantamax form.",
   "gui.trainers_workshop.field.alpha": "Alpha",
   "gui.trainers_workshop.hint.alpha": "Alpha look (bigger size, alpha eyes and mark) plus all IVs 31, more levels (config alphaTrainerLevelBonus, max level 100) and a TM move if it knows none. Turning it off restores the IVs, level and moves. Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule.",
-  "gui.trainers_workshop.alpha_note": "Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule."
+  "gui.trainers_workshop.alpha_note": "Trainer Alphas get real stat boosts from IVs/levels, not the wild Alpha battle rule.",
+  "command.trainers_workshop.challenge.players_only": "Only players can have a challenge. From the console, use: execute as <player> run challenge ...",
+  "command.trainers_workshop.challenge.started": "Challenge %s started. Only Pokémon you get from now on count.",
+  "command.trainers_workshop.challenge.rerolled": "Team %s accepted (rerolled slots: %s). Your challenge goes on.",
+  "command.trainers_workshop.challenge.abandoned": "Challenge %s abandoned. Rewards you already got are yours to keep.",
+  "command.trainers_workshop.challenge.none": "You have no challenge. Challenges won: %s. Make a team on PokéRoll and start one with its TW1 code.",
+  "command.trainers_workshop.challenge.active": "Challenge %s (challenges won: %s):",
+  "command.trainers_workshop.challenge.reroll_waiting": "Waiting for your rerolled team: reroll up to %s slot(s) on PokéRoll, then paste the new TW1 code.",
+  "command.trainers_workshop.challenge.shiny_pending": "Shiny reward waiting for %s slot(s)."
 }
