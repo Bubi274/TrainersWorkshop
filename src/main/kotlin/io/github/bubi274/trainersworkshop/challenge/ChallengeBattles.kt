@@ -15,6 +15,7 @@ import net.minecraft.text.MutableText
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
+import java.util.UUID
 
 /**
  * Challenge battles: the party check before a battle, the result after it, and the rewards.
@@ -28,31 +29,62 @@ object ChallengeBattles {
 
     private fun role(trainerId: String): TrainerRole? = ChallengeTrainers.role(WorkshopConfig.data.challengeRegions, trainerId)
 
-    /** Right before RCT starts a battle with [trainerId]: returns true to cancel it (the player is told why). */
-    fun shouldBlock(player: ServerPlayerEntity, trainerId: String): Boolean {
+    /**
+     * Player → id of the challenge whose party check let the current challenge battle start. Only that battle's
+     * result counts, so a battle that started without a challenge (or with another team) can't complete one.
+     */
+    private val approved = HashMap<UUID, String>()
+
+    /** (player, trainer entity) → last time the "blocked" text was shown: force-battle-on-sight retries often. */
+    private val lastNotice = HashMap<Pair<UUID, UUID>, Long>()
+    private const val NOTICE_COOLDOWN_MS = 10_000L
+
+    /**
+     * Right before RCT starts a battle with the trainer [trainerId] (entity [trainerEntity]): returns true to cancel it.
+     * The player is told why, at most once every 10 seconds per trainer.
+     */
+    fun shouldBlock(player: ServerPlayerEntity, trainerId: String, trainerEntity: UUID): Boolean {
+        approved.remove(player.uuid)
         role(trainerId) ?: return false
         val data = ChallengeService.data(player)
         val active = data.active ?: return false
+        val messages = blockReasons(player, data, active)
+        if (messages.isEmpty()) {
+            approved[player.uuid] = active.challenge.id
+            return false
+        }
+        val now = System.currentTimeMillis()
+        val key = player.uuid to trainerEntity
+        if (now - (lastNotice[key] ?: 0L) >= NOTICE_COOLDOWN_MS) {
+            lastNotice[key] = now
+            messages.forEach { player.sendMessage(it, false) }
+        }
+        return true
+    }
+
+    /** Why a challenge battle can't start now (empty = it can). */
+    private fun blockReasons(player: ServerPlayerEntity, data: PlayerChallengeData, active: ActiveChallenge): List<Text> {
         if (active.defeatPending) {
-            player.sendMessage(Text.translatable("$KEY.blocked_defeat").formatted(Formatting.RED), false)
-            player.sendMessage(defeatChoices(), false)
-            return true
+            return listOf(Text.translatable("$KEY.blocked_defeat").formatted(Formatting.RED), defeatChoices())
         }
         if (active.rerollAllow != null) {
-            player.sendMessage(Text.translatable("$KEY.blocked_reroll").formatted(Formatting.RED), false)
-            player.sendMessage(ChallengeCommand.rerollLink(ChallengeService.rerollCode(player)), false)
-            return true
+            return listOf(
+                Text.translatable("$KEY.blocked_reroll").formatted(Formatting.RED),
+                ChallengeCommand.rerollLink(ChallengeService.rerollCode(player)),
+            )
+        }
+        val unpaid = data.unpaidShinySlots()
+        if (unpaid.isNotEmpty()) {
+            return listOf(Text.translatable("$KEY.blocked_shiny").formatted(Formatting.RED)) + shinyChoices(active, unpaid)
         }
         val party = Cobblemon.storage.getParty(player).toList()
         val result = checkParty(player, active, party)
-        if (result.valid) return false
-        player.sendMessage(Text.translatable("$KEY.blocked_party").formatted(Formatting.RED), false)
-        result.problems.forEach { problem ->
+        if (result.valid) return emptyList()
+        return listOf(Text.translatable("$KEY.blocked_party").formatted(Formatting.RED)) + result.problems.map { problem ->
             val name = party[problem.member].getDisplayName(false).copy()
             val reason = Text.translatable("$KEY.reason.${problem.reason.name.lowercase()}")
-            player.sendMessage(Text.literal("- ").append(name).append(Text.literal(": ")).append(reason).formatted(Formatting.GRAY), false)
+            Text.literal("- ").append(name).append(Text.literal(": ")).append(reason).formatted(Formatting.GRAY)
         }
-        return true
     }
 
     /** Checks [party] against the active team. The party is recorded first, so a missed event can't change the result. */
@@ -70,9 +102,12 @@ object ChallengeBattles {
     /** RCT finished a battle between [player] and the trainers [trainerIds] ([won] = the player won). */
     fun onResult(player: ServerPlayerEntity, trainerIds: List<String>, won: Boolean) {
         val (trainerId, role) = trainerIds.firstNotNullOfOrNull { id -> role(id)?.let { id to it } } ?: return
+        val approvedId = approved.remove(player.uuid) ?: return
         val state = ChallengeState.get(player.server)
         val data = state.player(player.uuid)
         val active = data.active ?: return
+        // The team changed during the battle: this battle doesn't count.
+        if (active.challenge.id != approvedId) return
         if (!won) {
             state.recordLoss(player.uuid)
             player.sendMessage(Text.translatable("$KEY.defeat").formatted(Formatting.RED), false)

@@ -3,6 +3,7 @@ package io.github.bubi274.trainersworkshop.challenge
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.api.Priority
 import com.cobblemon.mod.common.api.events.CobblemonEvents
+import com.cobblemon.mod.common.battles.BattleRegistry
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
@@ -60,14 +61,24 @@ object ChallengeService {
 
     fun data(player: ServerPlayerEntity): PlayerChallengeData = ChallengeState.get(player.server).player(player.uuid)
 
+    /** Changing the team in the middle of a battle is refused (that battle's result wouldn't fit the new team). */
+    private fun notInBattle(player: ServerPlayerEntity) {
+        if (BattleRegistry.getBattleByParticipatingPlayer(player) != null) {
+            throw ChallengeActionException("You are in a battle. Paste your code after the battle ends.")
+        }
+    }
+
     /** Starts a challenge; everything the player has right now counts as owned before the start. */
     fun start(player: ServerPlayerEntity, code: String): ActiveChallenge {
+        notInBattle(player)
         sweep(player)
         return ChallengeState.get(player.server).start(player.uuid, code, System.currentTimeMillis())
     }
 
-    fun applyReroll(player: ServerPlayerEntity, code: String): ActiveChallenge =
-        ChallengeState.get(player.server).applyReroll(player.uuid, code)
+    fun applyReroll(player: ServerPlayerEntity, code: String): ActiveChallenge {
+        notInBattle(player)
+        return ChallengeState.get(player.server).applyReroll(player.uuid, code)
+    }
 
     fun rerollCode(player: ServerPlayerEntity): String =
         ChallengeState.get(player.server).rerollCode(player.uuid)

@@ -195,7 +195,7 @@ object RctAccess {
     fun blockChallengeBattle(mob: TrainerMob, player: PlayerEntity): Boolean = try {
         val server = player as? ServerPlayerEntity
         val id = mob.trainerId
-        server != null && id != null && ChallengeBattles.shouldBlock(server, id)
+        server != null && id != null && ChallengeBattles.shouldBlock(server, id, mob.uuid)
     } catch (e: Exception) {
         RctCompat.warn("Challenge check failed for ${mob.trainerId}; the battle goes ahead.", e)
         false

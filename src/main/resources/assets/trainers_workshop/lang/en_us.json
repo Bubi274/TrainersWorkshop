@@ -238,6 +238,7 @@
   "command.trainers_workshop.challenge.defeat_waiting": "You lost a challenge battle. Choose what to do next:",
   "message.trainers_workshop.challenge.blocked_defeat": "You lost your last challenge battle. Choose what to do next first:",
   "message.trainers_workshop.challenge.blocked_reroll": "You chose Reroll 1. Reroll on PokéRoll and paste the new TW1 code (/challenge paste) first:",
+  "message.trainers_workshop.challenge.blocked_shiny": "Pick the stat for your shiny reward first:",
   "message.trainers_workshop.challenge.blocked_party": "This is a challenge battle, but your party doesn't fit your team:",
   "message.trainers_workshop.challenge.reason.owned_before": "you had it before this challenge started",
   "message.trainers_workshop.challenge.reason.not_on_team": "not on your team (and not a later evolution of a team slot)",
