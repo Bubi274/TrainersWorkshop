@@ -65,6 +65,9 @@ object ChallengeService {
     fun applyReroll(player: ServerPlayerEntity, code: String): ActiveChallenge =
         ChallengeState.get(player.server).applyReroll(player.uuid, code)
 
+    fun rerollCode(player: ServerPlayerEntity): String =
+        ChallengeState.get(player.server).rerollCode(player.uuid)
+
     fun abandon(player: ServerPlayerEntity): ActiveChallenge =
         ChallengeState.get(player.server).abandon(player.uuid)
 

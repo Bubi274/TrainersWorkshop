@@ -8,6 +8,7 @@ import io.github.bubi274.trainersworkshop.config.WorkshopConfig
 import io.github.bubi274.trainersworkshop.editor.EditorSessions
 import io.github.bubi274.trainersworkshop.editor.TrainerOverrides
 import io.github.bubi274.trainersworkshop.interaction.PokemonInteractionHandler
+import io.github.bubi274.trainersworkshop.network.ChallengePayloads
 import io.github.bubi274.trainersworkshop.network.EditorPayloads
 import io.github.bubi274.trainersworkshop.registry.ModCreativeTabs
 import io.github.bubi274.trainersworkshop.registry.ModItems
@@ -33,6 +34,7 @@ object TrainersWorkshop : ModInitializer {
         EditorSessions.register()
         RaidDensCompat.register()
         RctCompat.init()
+        ChallengePayloads.register()
         ChallengeService.register()
         ChallengeCommand.register()
 

@@ -178,6 +178,13 @@ class ChallengeState : PersistentState() {
         return ChallengeCode.encodeReroll(active.code, allow)
     }
 
+    /** The TWR1 code of the reroll the player is waiting for (to copy it again). */
+    fun rerollCode(player: UUID): String {
+        val active = player(player).active ?: throw ChallengeActionException("You have no challenge.")
+        val allow = active.rerollAllow ?: throw ChallengeActionException("You have no reroll waiting. Choose Reroll 1 after a loss first.")
+        return ChallengeCode.encodeReroll(active.code, allow)
+    }
+
     /** Takes the TW1 code PokéRoll made from the reroll code. The original start (and so the ledger rule) is kept. */
     fun applyReroll(player: UUID, pastedCode: String): ActiveChallenge {
         val data = player(player)

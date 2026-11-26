@@ -226,5 +226,11 @@
   "command.trainers_workshop.challenge.none": "You have no challenge. Challenges won: %s. Make a team on PokéRoll and start one with its TW1 code.",
   "command.trainers_workshop.challenge.active": "Challenge %s (challenges won: %s):",
   "command.trainers_workshop.challenge.reroll_waiting": "Waiting for your rerolled team: reroll up to %s slot(s) on PokéRoll, then paste the new TW1 code.",
-  "command.trainers_workshop.challenge.shiny_pending": "Shiny reward waiting for %s slot(s)."
+  "command.trainers_workshop.challenge.shiny_pending": "Shiny reward waiting for %s slot(s).",
+  "command.trainers_workshop.challenge.copy_reroll": "[Copy reroll code]",
+  "command.trainers_workshop.challenge.copy_reroll.hover": "Click to copy the TWR1 code, then paste it on PokéRoll.",
+  "message.trainers_workshop.challenge.reroll_copied": "Reroll code copied. Paste it on PokéRoll, reroll, then copy the new TW1 code and use /challenge paste.",
+  "message.trainers_workshop.challenge.paste_no_server": "This world or server doesn't have Trainer's Workshop 3.0, so the code can't be sent.",
+  "key.trainers_workshop.paste_challenge_code": "Paste challenge code",
+  "key.categories.trainers_workshop": "Trainer's Workshop"
 }

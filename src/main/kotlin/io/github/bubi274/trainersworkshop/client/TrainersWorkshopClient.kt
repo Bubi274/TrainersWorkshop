@@ -6,5 +6,6 @@ import net.fabricmc.api.ClientModInitializer
 object TrainersWorkshopClient : ClientModInitializer {
     override fun onInitializeClient() {
         ClientEditor.register()
+        ClientChallenge.register()
     }
 }
