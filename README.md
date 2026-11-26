@@ -190,7 +190,8 @@ On first launch, the mod creates `config/trainers_workshop.json`:
 {
   "raidTierSevenShinyBerryChance": 0.05,
   "eggMoveGemCost": 3,
-  "alphaTrainerLevelBonus": 5
+  "alphaTrainerLevelBonus": 5,
+  "rctLootOnRematch": true
 }
 ```
 
@@ -198,6 +199,8 @@ On first launch, the mod creates `config/trainers_workshop.json`:
   (`0.05` = 5%, `0` = disabled).
 - `alphaTrainerLevelBonus` is how many levels the Trainer Editor's Alpha toggle adds (`0` to `100`; the result never goes above level 100).
 - `eggMoveGemCost` is how many Type Gems teaching one egg move costs in the Survival PokeEditor (`1` to `64`).
+- `rctLootOnRematch`: `false` = beating an RCT trainer you already beat drops nothing from RCT's loot table
+  (badges only drop on the first win anyway). Custom loot set with the Trainer Editor still follows its own rule.
 - After editing, restart the server to apply the change (`/reload` also re-reads the file when Cobblemon Raid Dens is installed).
 - To confirm the raid integration loaded, look for `Added Shiny Berry to cobblemonraiddens:raid/tier/tier_seven`
   in `logs/latest.log`.

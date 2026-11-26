@@ -15,6 +15,8 @@ data class WorkshopConfigData(
     var eggMoveGemCost: Int = 3,
     /** Levels a trainer Pokémon gains when the Trainer Editor makes it an Alpha (0..100, never above level 100). */
     var alphaTrainerLevelBonus: Int = 5,
+    /** false: a rematch win against an RCT trainer drops nothing from RCT's loot table (badges only drop on the first win anyway). */
+    var rctLootOnRematch: Boolean = true,
 )
 
 object WorkshopConfig {

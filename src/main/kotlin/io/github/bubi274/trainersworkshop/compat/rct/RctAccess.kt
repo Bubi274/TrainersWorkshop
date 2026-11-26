@@ -10,6 +10,8 @@ import com.gitlab.srcmc.rctmod.api.RCTMod
 import com.gitlab.srcmc.rctmod.api.data.sync.PlayerState
 import com.gitlab.srcmc.rctmod.world.entities.TrainerMob
 import io.github.bubi274.trainersworkshop.TrainersWorkshop
+import io.github.bubi274.trainersworkshop.config.WorkshopConfig
+import io.github.bubi274.trainersworkshop.rematch.RematchRules
 import io.github.bubi274.trainersworkshop.editor.LootMode
 import io.github.bubi274.trainersworkshop.editor.TrainerGimmickRules
 import io.github.bubi274.trainersworkshop.editor.TrainerGimmicks
@@ -161,14 +163,26 @@ object RctAccess {
 
     /**
      * Called from the mixin when a trainer is defeated and RCT is about to drop loot.
-     * Drops the custom loot; returns true if RCT's default loot table should be skipped.
+     * Drops the custom loot; returns true if RCT's default loot table should be skipped
+     * (the trainer's edits say so, or it is a rematch and rctLootOnRematch is off).
      */
     @JvmStatic
-    fun dropEditedLoot(mob: TrainerMob, player: PlayerEntity): Boolean = try {
-        dropLoot(mob, player)
+    fun dropEditedLoot(mob: TrainerMob, player: PlayerEntity): Boolean {
+        val skipEdited = try {
+            dropLoot(mob, player)
+        } catch (e: Exception) {
+            RctCompat.warn("Could not drop custom loot for ${mob.uuid}.", e)
+            false
+        }
+        return skipEdited || RematchRules.skipRctLoot(WorkshopConfig.data.rctLootOnRematch, defeatCount(mob, player))
+    }
+
+    /** How often [player] has beaten this trainer, this win included (0 if RCT can't tell). */
+    private fun defeatCount(mob: TrainerMob, player: PlayerEntity): Int = try {
+        RCTMod.getInstance().trainerManager.getBattleMemory(mob).getDefeatByCount(mob.trainerId, player)
     } catch (e: Exception) {
-        RctCompat.warn("Could not drop custom loot for ${mob.uuid}.", e)
-        false
+        RctCompat.warn("Could not read how often ${player.name.string} beat ${mob.trainerId}.", e)
+        0
     }
 
     private fun dropLoot(mob: TrainerMob, player: PlayerEntity): Boolean {
